@@ -528,19 +528,22 @@
         currentUser = null;
       }
 
-      document.getElementById('boot-loader').classList.add('hidden');
-
       if (!currentUser) {
+        document.getElementById('boot-loader').classList.add('hidden');
         document.getElementById('auth-screen').classList.remove('hidden');
         document.getElementById('app-shell').classList.add('hidden');
         return;
       }
 
+      profileUserId = currentUser.steam_id;
+      // Load users & reviews BEFORE revealing the page so Home stats appear populated immediately
+      await Promise.all([loadUsers(), loadReviews()]);
+      renderApp(true);
+      document.getElementById('boot-loader').classList.add('hidden');
       document.getElementById('auth-screen').classList.add('hidden');
       document.getElementById('app-shell').classList.remove('hidden');
-      profileUserId = currentUser.steam_id;
-      await Promise.all([loadUsers(), loadReviews(), loadMyLibrary()]);
-      renderApp(true);
+      // Fetch Steam library in the background so it doesn't slow down opening the site
+      loadMyLibrary();
     }
 
     async function loadUsers() {
