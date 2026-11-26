@@ -4,8 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AToQcritics — Оценки игр из библиотеки Steam</title>
-  <link rel="icon" type="image/jpeg" href="/logo.jpg" />
-  <link rel="apple-touch-icon" href="/logo.jpg" />
+  <link rel="shortcut icon" href="/favicon.ico?v=2" />
+  <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=2" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=2" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
@@ -386,7 +388,7 @@
       document.getElementById('app-shell').classList.remove('hidden');
       profileUserId = currentUser.steam_id;
       await Promise.all([loadUsers(), loadReviews(), loadMyLibrary()]);
-      renderApp();
+      renderApp(true);
     }
 
     async function loadUsers() {
@@ -407,7 +409,7 @@
       }
     }
 
-    function renderCard(rev, idx = 0) {
+    function renderCard(rev, idx = 0, animate = false) {
       const m = scoreMeta(rev.total);
       const liked = rev.likes.includes(currentUser.steam_id);
       const disliked = rev.dislikes.includes(currentUser.steam_id);
@@ -435,7 +437,7 @@
         }).join('');
 
       return `
-        <article class="liquid-card anim-card rounded-[26px] p-5 space-y-4 relative" style="animation-delay:${delay}ms;">
+        <article data-review-card="${esc(rev.id)}" class="liquid-card ${animate ? 'anim-card' : ''} rounded-[26px] p-5 space-y-4 relative" ${animate ? `style="animation-delay:${delay}ms;"` : ''}>
           <div class="flex flex-col sm:flex-row gap-4">
             <a href="https://store.steampowered.com/app/${rev.appId}/" target="_blank" rel="noopener" class="sm:w-52 aspect-[460/215] rounded-2xl overflow-hidden border border-white/15 shrink-0 block group">
               <img src="${esc(rev.gameImg)}" alt="${esc(rev.gameTitle)}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
@@ -481,7 +483,7 @@
                   <span class="text-[11px]">+</span>
                 </button>
                 ${pickerOpen ? `
-                  <div class="anim-popover absolute left-0 bottom-full mb-2 z-30 liquid-glass-strong rounded-2xl p-2 flex flex-wrap gap-1 w-56 shadow-2xl">
+                  <div class="anim-popover absolute left-0 bottom-full mb-2 z-30 liquid-glass-strong rounded-2xl p-2 grid grid-cols-6 gap-1 w-max shadow-2xl">
                     ${EMOJI_PALETTE.map(em => {
                       const chosen = Array.isArray(reactions[em]) && reactions[em].includes(currentUser.steam_id);
                       return `<button type="button" data-react-review="${esc(rev.id)}" data-emoji="${em}" class="emoji-btn w-8 h-8 rounded-xl flex items-center justify-center text-base cursor-pointer ${chosen ? 'bg-[#d9ff00]/20 ring-1 ring-[#d9ff00]/60' : ''}">${em}</button>`;
@@ -503,7 +505,21 @@
         </article>`;
     }
 
-    function renderApp() {
+    function updateSingleCard(revId) {
+      const rev = reviews.find(r => r.id === revId);
+      if (!rev) return renderApp(false);
+      const oldEl = document.querySelector(`[data-review-card="${CSS.escape(revId)}"]`);
+      if (!oldEl) return renderApp(false);
+      const wrap = document.createElement('div');
+      wrap.innerHTML = renderCard(rev, 0, false).trim();
+      const nextEl = wrap.firstElementChild;
+      if (nextEl) {
+        oldEl.replaceWith(nextEl);
+        if (window.lucide) lucide.createIcons();
+      }
+    }
+
+    function renderApp(animateCards = false) {
       const isFeed = activeView === 'feed';
       document.getElementById('view-feed').classList.toggle('hidden', !isFeed);
       document.getElementById('view-profile').classList.toggle('hidden', isFeed);
@@ -522,7 +538,7 @@
         if (sort === 'highest') list.sort((a,b) => b.total - a.total);
         else if (sort === 'lowest') list.sort((a,b) => a.total - b.total);
         else if (sort === 'popular') list.sort((a,b) => (b.likes.length - b.dislikes.length) - (a.likes.length - a.dislikes.length));
-        document.getElementById('feed-list').innerHTML = list.length ? list.map((r, i) => renderCard(r, i)).join('') : '<div class="liquid-glass anim-card rounded-[26px] p-10 text-center text-sm text-slate-300">Лента пока пуста. Нажмите «+ Новый обзор», чтобы оценить первую игру!</div>';
+        document.getElementById('feed-list').innerHTML = list.length ? list.map((r, i) => renderCard(r, i, animateCards)).join('') : '<div class="liquid-glass anim-card rounded-[26px] p-10 text-center text-sm text-slate-300">Лента пока пуста. Нажмите «+ Новый обзор», чтобы оценить первую игру!</div>';
       } else {
         const u = users.find(x => x.steam_id === profileUserId) || currentUser;
         const uRevs = reviews.filter(r => r.userId === u.steam_id);
@@ -547,7 +563,7 @@
         const worst = [...uRevs].sort((a,b) => a.total - b.total).slice(0,3);
         document.getElementById('profile-top-best').innerHTML = best.length ? best.map(row).join('') : '<div class="text-xs text-slate-400">Пока нет оценённых игр</div>';
         document.getElementById('profile-top-worst').innerHTML = worst.length ? worst.map(row).join('') : '<div class="text-xs text-slate-400">Пока нет оценённых игр</div>';
-        document.getElementById('profile-reviews-list').innerHTML = uRevs.length ? uRevs.map((r, i) => renderCard(r, i)).join('') : '<div class="liquid-glass rounded-[26px] p-8 text-center text-sm text-slate-400">Пока нет оценённых игр.</div>';
+        document.getElementById('profile-reviews-list').innerHTML = uRevs.length ? uRevs.map((r, i) => renderCard(r, i, animateCards)).join('') : '<div class="liquid-glass rounded-[26px] p-8 text-center text-sm text-slate-400">Пока нет оценённых игр.</div>';
       }
       if (window.lucide) lucide.createIcons();
     }
@@ -667,8 +683,8 @@
       ring.style.setProperty('--ring-color', m.c);
     }
 
-    document.getElementById('nav-brand').onclick = document.getElementById('nav-feed').onclick = document.getElementById('btn-back-to-feed').onclick = () => { activeView = 'feed'; openEmojiPickerId = null; renderApp(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
-    document.getElementById('nav-profile').onclick = () => { activeView = 'profile'; profileUserId = currentUser.steam_id; openEmojiPickerId = null; renderApp(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+    document.getElementById('nav-brand').onclick = document.getElementById('nav-feed').onclick = document.getElementById('btn-back-to-feed').onclick = () => { activeView = 'feed'; openEmojiPickerId = null; renderApp(true); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+    document.getElementById('nav-profile').onclick = () => { activeView = 'profile'; profileUserId = currentUser.steam_id; openEmojiPickerId = null; renderApp(true); window.scrollTo({ top: 0, behavior: 'smooth' }); };
     document.getElementById('btn-logout').onclick = async () => { await fetch('/api/logout', { method: 'POST' }); location.reload(); };
     document.getElementById('btn-new-review').onclick = () => {
       openEmojiPickerId = null;
@@ -755,21 +771,24 @@
     // Close emoji picker on outside click
     document.addEventListener('click', e => {
       if (openEmojiPickerId && !e.target.closest('[data-toggle-emoji-picker]') && !e.target.closest('.anim-popover')) {
+        const prevId = openEmojiPickerId;
         openEmojiPickerId = null;
-        renderApp();
+        updateSingleCard(prevId);
       }
     });
 
     document.getElementById('app-shell').onclick = async e => {
       const p = e.target.closest('[data-open-profile]');
-      if (p) { activeView = 'profile'; profileUserId = p.dataset.openProfile; openEmojiPickerId = null; renderApp(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+      if (p) { activeView = 'profile'; profileUserId = p.dataset.openProfile; openEmojiPickerId = null; renderApp(true); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
 
       const ep = e.target.closest('[data-toggle-emoji-picker]');
       if (ep) {
         e.stopPropagation();
         const id = ep.dataset.toggleEmojiPicker;
+        const prevId = openEmojiPickerId;
         openEmojiPickerId = openEmojiPickerId === id ? null : id;
-        renderApp();
+        if (prevId && prevId !== id) updateSingleCard(prevId);
+        updateSingleCard(id);
         return;
       }
 
@@ -780,28 +799,70 @@
         const emoji = rx.dataset.emoji;
         openEmojiPickerId = null;
         lastAnimatedReaction = `${revId}:${emoji}`;
-        const r = await fetch(`/api/reviews/${revId}/react`, {
+        // Optimistic instant UI update
+        const rev = reviews.find(x => x.id === revId);
+        if (rev) {
+          rev.reactions ||= {};
+          const list = (rev.reactions[emoji] ||= []);
+          const uid = currentUser.steam_id;
+          const idx = list.indexOf(uid);
+          if (idx >= 0) list.splice(idx, 1);
+          else list.push(uid);
+          updateSingleCard(revId);
+        }
+        fetch(`/api/reviews/${revId}/react`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ emoji })
-        });
-        if (r.ok) {
-          reviews = (await r.json()).reviews;
-          renderApp();
-        }
+        }).then(r => r.ok ? r.json() : null).then(d => {
+          if (d && d.reviews) {
+            reviews = d.reviews;
+            lastAnimatedReaction = null;
+            updateSingleCard(revId);
+          }
+        }).catch(() => {});
         return;
       }
 
       const v = e.target.closest('[data-vote]');
       if (v) {
-        v.classList.add('anim-pop');
-        const r = await fetch(`/api/reviews/${v.dataset.vote}/vote`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ vote: Number(v.dataset.val) }) });
-        reviews = (await r.json()).reviews;
-        renderApp();
+        const revId = v.dataset.vote;
+        const val = Number(v.dataset.val);
+        const uid = currentUser.steam_id;
+        // Optimistic instant UI update (0 ms latency!)
+        const rev = reviews.find(x => x.id === revId);
+        if (rev) {
+          if (val === 1) {
+            if (rev.likes.includes(uid)) rev.likes = rev.likes.filter(x => x !== uid);
+            else { rev.likes.push(uid); rev.dislikes = rev.dislikes.filter(x => x !== uid); }
+          } else {
+            if (rev.dislikes.includes(uid)) rev.dislikes = rev.dislikes.filter(x => x !== uid);
+            else { rev.dislikes.push(uid); rev.likes = rev.likes.filter(x => x !== uid); }
+          }
+          updateSingleCard(revId);
+          const freshBtn = document.querySelector(`[data-review-card="${CSS.escape(revId)}"] [data-vote="${CSS.escape(revId)}"][data-val="${val}"]`);
+          if (freshBtn) freshBtn.classList.add('anim-pop');
+        }
+        fetch(`/api/reviews/${revId}/vote`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ vote: val })
+        }).then(r => r.ok ? r.json() : null).then(d => {
+          if (d && d.reviews) {
+            reviews = d.reviews;
+            updateSingleCard(revId);
+          }
+        }).catch(() => {});
         return;
       }
+
       const tc = e.target.closest('[data-toggle-comments]');
-      if (tc) { openComments[tc.dataset.toggleComments] = !openComments[tc.dataset.toggleComments]; renderApp(); return; }
+      if (tc) {
+        const revId = tc.dataset.toggleComments;
+        openComments[revId] = !openComments[revId];
+        updateSingleCard(revId);
+        return;
+      }
       const ed = e.target.closest('[data-edit-review]');
       if (ed) {
         const rev = reviews.find(x => x.id === ed.dataset.editReview);
@@ -833,10 +894,11 @@
       e.preventDefault();
       const text = f.querySelector('input[name="text"]').value.trim();
       if (!text) return;
-      const r = await fetch(`/api/reviews/${f.dataset.commentForm}/comments`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ text }) });
+      const revId = f.dataset.commentForm;
+      const r = await fetch(`/api/reviews/${revId}/comments`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ text }) });
       reviews = (await r.json()).reviews;
-      openComments[f.dataset.commentForm] = true;
-      renderApp();
+      openComments[revId] = true;
+      updateSingleCard(revId);
       showToast('Комментарий добавлен');
     };
 
