@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>AToQcritics — Оценки игр из библиотеки Steam</title>
   <link rel="shortcut icon" href="/favicon.ico?v=2" />
   <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2" />
@@ -170,6 +170,17 @@
     .anim-popover { animation: popoverIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) both; }
     .anim-drawer { animation: drawerExpand 0.24s cubic-bezier(0.22, 1, 0.36, 1) both; }
 
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    @media (max-width: 639px) {
+      input, textarea, select { font-size: 16px !important; }
+      .liquid-card:hover { transform: none; }
+    }
+    @media (pointer: coarse) {
+      input[type="range"].criteria-slider { height: 10px; }
+      input[type="range"].criteria-slider::-webkit-slider-thumb { width: 26px; height: 26px; }
+      input[type="range"].criteria-slider::-moz-range-thumb { width: 26px; height: 26px; }
+    }
     .emoji-btn {
       transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1), background 0.15s ease;
     }
@@ -179,7 +190,7 @@
 </head>
 <body>
   <div class="ambient-bg" aria-hidden="true"></div>
-  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+  <div id="toast-container" class="fixed bottom-20 sm:bottom-5 left-3 right-3 sm:left-auto sm:right-5 z-50 flex flex-col items-center sm:items-end gap-2 pointer-events-none"></div>
 
   <!-- INITIAL SPLASH LOADER -->
   <div id="boot-loader" class="relative z-30 min-h-screen flex flex-col items-center justify-center gap-4 p-4">
@@ -213,25 +224,25 @@
 
   <!-- MAIN APP -->
   <div id="app-shell" class="hidden relative z-10 min-h-screen flex flex-col anim-view">
-    <header class="sticky top-0 z-30 px-3 sm:px-6 pt-3 pb-2">
-      <div class="max-w-6xl mx-auto liquid-glass rounded-full px-4 py-2 flex items-center justify-between gap-2">
-        <button id="nav-brand" type="button" class="flex items-center gap-2.5 cursor-pointer group">
-          <img src="/logo.jpg" alt="AToQ" class="w-9 h-9 rounded-full object-cover border border-white/25 group-hover:scale-105 transition" />
-          <span class="text-lg sm:text-xl font-black italic atoq-wordmark">AToQcritics</span>
+    <header class="sticky top-0 z-30 px-3 sm:px-6 pt-2.5 sm:pt-3 pb-2">
+      <div class="max-w-6xl mx-auto liquid-glass rounded-full px-3 sm:px-4 py-2 flex items-center justify-between gap-2">
+        <button id="nav-brand" type="button" class="flex items-center gap-2 sm:gap-2.5 cursor-pointer group shrink-0">
+          <img src="/logo.jpg" alt="AToQ" class="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover border border-white/25 group-hover:scale-105 transition" />
+          <span class="text-base sm:text-xl font-black italic atoq-wordmark">AToQcritics</span>
         </button>
-        <nav class="flex items-center gap-1 sm:gap-1.5">
-          <button id="nav-home" type="button" class="liquid-pill px-3.5 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-medium cursor-pointer">Главная</button>
-          <button id="nav-feed" type="button" class="liquid-pill px-3.5 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-medium cursor-pointer">Лента</button>
-          <button id="nav-profile" type="button" class="liquid-pill px-3.5 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-medium cursor-pointer">Профиль</button>
+        <nav class="hidden sm:flex items-center gap-1.5">
+          <button id="nav-home" type="button" class="liquid-pill px-4 py-2 rounded-full text-sm font-medium cursor-pointer">Главная</button>
+          <button id="nav-feed" type="button" class="liquid-pill px-4 py-2 rounded-full text-sm font-medium cursor-pointer">Лента</button>
+          <button id="nav-profile" type="button" class="liquid-pill px-4 py-2 rounded-full text-sm font-medium cursor-pointer">Профиль</button>
         </nav>
-        <div class="flex items-center gap-2">
-          <button id="btn-new-review" type="button" class="btn-acid px-4 py-2 rounded-full text-xs sm:text-sm cursor-pointer">+ Новый обзор</button>
+        <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <button id="btn-new-review" type="button" class="btn-acid px-3.5 sm:px-4 py-2 rounded-full text-xs sm:text-sm cursor-pointer">+ <span class="hidden sm:inline">Новый </span>обзор</button>
           <button id="btn-logout" type="button" title="Выйти" class="liquid-pill p-2 rounded-full text-slate-300 hover:text-white cursor-pointer"><i data-lucide="log-out" class="w-4 h-4"></i></button>
         </div>
       </div>
     </header>
 
-    <main class="flex-1 w-full max-w-6xl mx-auto px-3 sm:px-6 pt-4 pb-16">
+    <main class="flex-1 w-full max-w-6xl mx-auto px-3 sm:px-6 pt-3 sm:pt-4 pb-24 sm:pb-16">
       <section id="view-home" class="space-y-5 anim-view">
         <!-- Hero KPI Summary Row -->
         <div id="home-kpi-row" class="grid grid-cols-2 lg:grid-cols-4 gap-3.5"></div>
@@ -298,7 +309,7 @@
             <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#66c0f4]/15 text-[#66c0f4] border border-[#66c0f4]/30">Общая лента Steam</span>
             <h2 class="text-xl sm:text-2xl font-bold mt-1">Оценки сообщества</h2>
           </div>
-          <div id="community-strip" class="flex items-center gap-2 overflow-x-auto"></div>
+          <div id="community-strip" class="flex items-center gap-2 overflow-x-auto no-scrollbar pb-0.5"></div>
         </div>
         <div class="liquid-glass rounded-[24px] p-3.5 flex flex-col md:flex-row gap-3">
           <div class="relative flex-1">
@@ -345,19 +356,37 @@
         <div id="profile-reviews-list" class="space-y-4"></div>
       </section>
     </main>
+
+    <!-- MOBILE FLOATING LIQUID-GLASS BOTTOM TAB BAR -->
+    <nav class="sm:hidden fixed bottom-3 left-3 right-3 z-30 pb-[env(safe-area-inset-bottom)]" aria-label="Мобильная навигация">
+      <div class="liquid-glass-strong rounded-full p-1.5 grid grid-cols-3 gap-1 shadow-2xl">
+        <button id="mnav-home" type="button" class="liquid-pill py-2.5 px-2 rounded-full text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer">
+          <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+          <span>Главная</span>
+        </button>
+        <button id="mnav-feed" type="button" class="liquid-pill py-2.5 px-2 rounded-full text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer">
+          <i data-lucide="flame" class="w-4 h-4"></i>
+          <span>Лента</span>
+        </button>
+        <button id="mnav-profile" type="button" class="liquid-pill py-2.5 px-2 rounded-full text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer">
+          <i data-lucide="user" class="w-4 h-4"></i>
+          <span>Профиль</span>
+        </button>
+      </div>
+    </nav>
   </div>
 
   <!-- MODAL: NEW REVIEW -->
-  <div id="review-modal" class="hidden fixed inset-0 z-40 flex items-center justify-center p-3 sm:p-5 bg-black/75 backdrop-blur-md anim-modal-bg">
-    <div class="liquid-glass-strong anim-modal-panel w-full max-w-2xl max-h-[92vh] rounded-[30px] flex flex-col overflow-hidden">
-      <div class="px-6 py-4 border-b border-white/10 flex items-center justify-between">
+  <div id="review-modal" class="hidden fixed inset-0 z-40 flex items-end sm:items-center justify-center p-0 sm:p-5 bg-black/75 backdrop-blur-md anim-modal-bg">
+    <div class="liquid-glass-strong anim-modal-panel w-full max-w-2xl max-h-[92dvh] rounded-t-[28px] sm:rounded-[30px] flex flex-col overflow-hidden pb-[env(safe-area-inset-bottom)]">
+      <div class="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-white/10 flex items-center justify-between">
         <div>
           <h2 id="modal-title" class="text-lg font-bold">Новый обзор</h2>
           <p id="modal-subtitle" class="text-xs text-slate-400">Поиск по всему каталогу Steam или вашей библиотеке</p>
         </div>
         <button id="btn-close-modal" type="button" class="liquid-pill p-2 rounded-full cursor-pointer"><i data-lucide="x" class="w-4 h-4"></i></button>
       </div>
-      <div class="p-6 overflow-y-auto flex-1 space-y-4">
+      <div class="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
         <div id="modal-step-search" class="space-y-4">
           <div class="flex flex-wrap gap-1.5 p-1 rounded-2xl sm:rounded-full bg-white/[0.04] border border-white/10 w-fit">
             <button id="tab-all-steam" type="button" class="liquid-pill liquid-pill-active px-3.5 py-2 rounded-full text-xs font-semibold cursor-pointer">Весь каталог Steam</button>
@@ -432,7 +461,7 @@
             </div>
           </label>
           <div id="criteria-sliders-container" class="space-y-3"></div>
-          <input id="input-hours" type="number" step="0.1" min="0" placeholder="Часов в Steam (подтягивается из библиотеки)" class="w-full px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/15 text-sm text-white focus:outline-none focus:border-[#66c0f4] transition" />
+          <input id="input-hours" type="number" step="0.1" min="0" placeholder="Количество часов" class="w-full px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/15 text-sm text-white focus:outline-none focus:border-[#66c0f4] transition" />
           <textarea id="input-review-text" rows="4" required maxlength="2000" placeholder="Текст вашей рецензии..." class="w-full px-4 py-3 rounded-2xl bg-white/[0.06] border border-white/15 text-sm text-white focus:outline-none focus:border-[#d9ff00] transition"></textarea>
           <div class="flex justify-end gap-2">
             <button id="btn-cancel-review" type="button" class="liquid-pill px-5 py-2.5 rounded-full text-sm cursor-pointer">Отмена</button>
@@ -698,7 +727,7 @@
                 <span class="text-sm font-bold leading-none">+</span>
               </button>
               ${pickerOpen ? `
-                <div class="anim-popover absolute left-0 bottom-full mb-2 z-30 liquid-glass-strong rounded-2xl p-2.5 grid grid-cols-7 gap-1.5 w-max shadow-2xl">
+                <div class="anim-popover absolute left-0 bottom-full mb-2 z-30 liquid-glass-strong rounded-2xl p-2 sm:p-2.5 grid grid-cols-5 sm:grid-cols-7 gap-1 sm:gap-1.5 w-max max-w-[calc(100vw-2.5rem)] shadow-2xl">
                   ${EMOJI_PALETTE.map(em => {
                     const chosen = Array.isArray(reactions[em]) && reactions[em].includes(currentUser.steam_id);
                     return `<button type="button" data-react-review="${esc(rev.id)}" data-emoji="${em}" class="emoji-btn w-10 h-10 rounded-xl flex items-center justify-center text-xl cursor-pointer ${chosen ? 'bg-[#d9ff00]/20 ring-1 ring-[#d9ff00]/60' : ''}">${em}</button>`;
@@ -727,7 +756,7 @@
           <form data-comment-form="${esc(rev.id)}" class="flex items-center gap-2 relative">
             <div class="relative shrink-0">
               <button type="button" data-toggle-comment-emoji="${esc(rev.id)}" title="Вставить эмодзи" class="liquid-pill w-9 h-9 rounded-full flex items-center justify-center text-lg cursor-pointer">😀</button>
-              <div data-comment-emoji-box="${esc(rev.id)}" class="hidden anim-popover absolute left-0 bottom-full mb-2 z-30 liquid-glass-strong rounded-2xl p-2 grid grid-cols-7 gap-1 w-max shadow-2xl">
+              <div data-comment-emoji-box="${esc(rev.id)}" class="hidden anim-popover absolute left-0 bottom-full mb-2 z-30 liquid-glass-strong rounded-2xl p-2 grid grid-cols-5 sm:grid-cols-7 gap-1 w-max max-w-[calc(100vw-2.5rem)] shadow-2xl">
                 ${EMOJI_PALETTE.map(em => `<button type="button" data-insert-comment-emoji="${esc(rev.id)}" data-emoji="${em}" class="emoji-btn w-9 h-9 rounded-xl flex items-center justify-center text-lg cursor-pointer">${em}</button>`).join('')}
               </div>
             </div>
@@ -763,7 +792,7 @@
       const delay = Math.min(idx * 40, 240);
 
       return `
-        <article data-review-card="${esc(rev.id)}" class="liquid-card ${animate ? 'anim-card' : ''} rounded-[26px] p-5 space-y-4 relative" ${animate ? `style="animation-delay:${delay}ms;"` : ''}>
+        <article data-review-card="${esc(rev.id)}" class="liquid-card ${animate ? 'anim-card' : ''} rounded-[24px] sm:rounded-[26px] p-4 sm:p-5 space-y-3.5 sm:space-y-4 relative" ${animate ? `style="animation-delay:${delay}ms;"` : ''}>
           <div class="flex flex-col sm:flex-row gap-4">
             ${rev.appId > 0 ? `
               <a href="https://store.steampowered.com/app/${rev.appId}/" target="_blank" rel="noopener" class="sm:w-56 aspect-[460/215] rounded-2xl overflow-hidden border border-white/15 shrink-0 block group bg-[#121a27]">
@@ -793,8 +822,8 @@
                   </div>
                 </div>
                 <!-- Metacritic-style colored background score badge with site-obsidian numbers -->
-                <div class="rounded-2xl min-w-[78px] px-3.5 py-2.5 text-center shrink-0" style="background:${m.bg}; box-shadow:${m.shadow};">
-                  <div class="text-3xl font-black leading-none tracking-tight text-[#090c12]">${rev.total}</div>
+                <div class="rounded-2xl min-w-[66px] sm:min-w-[78px] px-2.5 sm:px-3.5 py-2 sm:py-2.5 text-center shrink-0" style="background:${m.bg}; box-shadow:${m.shadow};">
+                  <div class="text-2xl sm:text-3xl font-black leading-none tracking-tight text-[#090c12]">${rev.total}</div>
                   <div class="text-[10px] font-extrabold uppercase tracking-wider text-[#090c12]/80 mt-1">${m.l}</div>
                 </div>
               </div>
@@ -1045,6 +1074,9 @@
       document.getElementById('nav-home').classList.toggle('liquid-pill-active', isHome);
       document.getElementById('nav-feed').classList.toggle('liquid-pill-active', isFeed);
       document.getElementById('nav-profile').classList.toggle('liquid-pill-active', isProfile && profileUserId === currentUser.steam_id);
+      document.getElementById('mnav-home').classList.toggle('liquid-pill-active', isHome);
+      document.getElementById('mnav-feed').classList.toggle('liquid-pill-active', isFeed);
+      document.getElementById('mnav-profile').classList.toggle('liquid-pill-active', isProfile && profileUserId === currentUser.steam_id);
 
       if (isHome) {
         renderHomeStats();
@@ -1241,9 +1273,9 @@
       ring.style.setProperty('--ring-color', m.c);
     }
 
-    document.getElementById('nav-brand').onclick = document.getElementById('nav-home').onclick = () => { activeView = 'home'; openEmojiPickerId = null; renderApp(true); window.scrollTo({ top: 0, behavior: 'smooth' }); };
-    document.getElementById('nav-feed').onclick = document.getElementById('btn-back-to-feed').onclick = () => { activeView = 'feed'; openEmojiPickerId = null; renderApp(true); window.scrollTo({ top: 0, behavior: 'smooth' }); };
-    document.getElementById('nav-profile').onclick = () => { activeView = 'profile'; profileUserId = currentUser.steam_id; openEmojiPickerId = null; renderApp(true); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+    document.getElementById('nav-brand').onclick = document.getElementById('nav-home').onclick = document.getElementById('mnav-home').onclick = () => { activeView = 'home'; openEmojiPickerId = null; renderApp(true); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+    document.getElementById('nav-feed').onclick = document.getElementById('mnav-feed').onclick = document.getElementById('btn-back-to-feed').onclick = () => { activeView = 'feed'; openEmojiPickerId = null; renderApp(true); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+    document.getElementById('nav-profile').onclick = document.getElementById('mnav-profile').onclick = () => { activeView = 'profile'; profileUserId = currentUser.steam_id; openEmojiPickerId = null; renderApp(true); window.scrollTo({ top: 0, behavior: 'smooth' }); };
     document.getElementById('btn-logout').onclick = async () => { await fetch('/api/logout', { method: 'POST' }); location.reload(); };
     document.getElementById('btn-new-review').onclick = () => {
       openEmojiPickerId = null;
