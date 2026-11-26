@@ -1,7 +1,7 @@
 {
   "name": "atoqcritics",
-  "version": "2.0.0",
-  "description": "AToQcritics — Steam game rating platform with real Steam OpenID, Steam library sync, full Steam catalog search, and free Cloud PostgreSQL (Supabase/Neon).",
+  "version": "2.1.0",
+  "description": "AToQcritics — Steam game rating platform with direct Steam OpenID 2.0, Steam library sync, full Steam catalog search, and free Cloud PostgreSQL.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -14,8 +14,6 @@
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "express-session": "^1.18.1",
-    "passport": "^0.7.0",
-    "passport-steam": "^1.0.17",
     "pg": "^8.13.1"
   }
 }

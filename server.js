@@ -4,17 +4,27 @@ const express = require('express');
 const session = require('express-session');
 const pgSession = require('connect-pg-simple')(session);
 const { Pool } = require('pg');
-const passport = require('passport');
-const SteamStrategy = require('passport-steam').Strategy;
 
 const PORT = process.env.PORT || 3000;
-const BASE_URL = (process.env.BASE_URL || `http://localhost:${PORT}`).replace(/\/$/, '');
-const STEAM_API_KEY = process.env.STEAM_API_KEY || '';
-const SESSION_SECRET = process.env.SESSION_SECRET || 'atoqcritics-dev-secret-change-me';
-const DATABASE_URL = process.env.DATABASE_URL || '';
+const STEAM_API_KEY = (process.env.STEAM_API_KEY || '').trim().replace(/^["']|["']$/g, '');
+const SESSION_SECRET = (process.env.SESSION_SECRET || 'atoqcritics-dev-secret-change-me').trim();
+const DATABASE_URL = (process.env.DATABASE_URL || '').trim().replace(/^["']|["']$/g, '');
+
+function getBaseUrl(req) {
+  let raw = (process.env.BASE_URL || '').trim().replace(/^["']|["']$/g, '').replace(/\/+$/, '');
+  if (raw) {
+    if (!/^https?:\/\//i.test(raw)) {
+      raw = (raw.includes('localhost') || raw.includes('127.0.0.1') ? 'http://' : 'https://') + raw;
+    }
+    return raw;
+  }
+  const proto = (req.headers['x-forwarded-proto'] || req.protocol || 'https').split(',')[0].trim();
+  const host = req.headers['x-forwarded-host'] || req.get('host');
+  return `${proto}://${host}`;
+}
 
 if (!DATABASE_URL) {
-  console.warn('ВНИМАНИЕ: DATABASE_URL не задан! Укажите строку подключения PostgreSQL (Supabase/Neon) в .env или переменных окружения хостинга.');
+  console.warn('ВНИМАНИЕ: DATABASE_URL не задан! Укажите строку подключения PostgreSQL (Supabase/Neon).');
 }
 
 // ==================== CLOUD POSTGRESQL (Supabase / Neon) ====================
@@ -68,53 +78,12 @@ async function initDb() {
   console.log('Облачная база PostgreSQL подключена и таблицы готовы.');
 }
 
-// ==================== PASSPORT STEAM OPENID ====================
-passport.serializeUser((user, done) => done(null, user.steam_id));
-passport.deserializeUser(async (steamId, done) => {
-  try {
-    const { rows } = await pool.query('SELECT * FROM users WHERE steam_id = $1', [steamId]);
-    done(null, rows[0] || null);
-  } catch (err) {
-    done(err);
-  }
-});
-
-passport.use(new SteamStrategy({
-  returnURL: `${BASE_URL}/auth/steam/return`,
-  realm: `${BASE_URL}/`,
-  apiKey: STEAM_API_KEY
-}, async (identifier, profile, done) => {
-  try {
-    const steamId = profile.id;
-    const name = profile.displayName || 'Steam User';
-    const avatar = (profile.photos && profile.photos[2] && profile.photos[2].value)
-      || (profile.photos && profile.photos[0] && profile.photos[0].value)
-      || '';
-    const profileUrl = profile._json && profile._json.profileurl
-      ? profile._json.profileurl
-      : `https://steamcommunity.com/profiles/${steamId}`;
-
-    const { rows } = await pool.query(`
-      INSERT INTO users (steam_id, name, avatar, profile_url, created_at)
-      VALUES ($1, $2, $3, $4, $5)
-      ON CONFLICT (steam_id) DO UPDATE SET
-        name = EXCLUDED.name,
-        avatar = EXCLUDED.avatar,
-        profile_url = EXCLUDED.profile_url
-      RETURNING *
-    `, [steamId, name, avatar, profileUrl, Date.now()]);
-
-    return done(null, rows[0]);
-  } catch (err) {
-    return done(err);
-  }
-}));
-
 // ==================== EXPRESS APP ====================
 const app = express();
 app.set('trust proxy', 1);
 app.use(express.json({ limit: '1mb' }));
 
+const isProdHttps = (process.env.BASE_URL || '').includes('https://') || Boolean(process.env.RENDER);
 const sessionConfig = {
   secret: SESSION_SECRET,
   resave: false,
@@ -122,7 +91,7 @@ const sessionConfig = {
   cookie: {
     maxAge: 30 * 24 * 60 * 60 * 1000,
     sameSite: 'lax',
-    secure: BASE_URL.startsWith('https://')
+    secure: isProdHttps
   }
 };
 
@@ -134,32 +103,120 @@ if (DATABASE_URL) {
 }
 
 app.use(session(sessionConfig));
-app.use(passport.initialize());
-app.use(passport.session());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Attach current user from session
+app.use(async (req, res, next) => {
+  if (req.session && req.session.steamId) {
+    try {
+      const { rows } = await pool.query('SELECT * FROM users WHERE steam_id = $1', [req.session.steamId]);
+      req.user = rows[0] || null;
+    } catch (err) {
+      req.user = null;
+    }
+  }
+  next();
+});
+
 function requireAuth(req, res, next) {
-  if (!req.isAuthenticated() || !req.user) {
+  if (!req.user) {
     return res.status(401).json({ error: 'Требуется авторизация через Steam' });
   }
   next();
 }
 
-// ==================== AUTH ROUTES ====================
-app.get('/auth/steam', (req, res, next) => {
+// ==================== DIRECT STEAM OPENID 2.0 (NO LEGACY PASSPORT BUGS) ====================
+app.get('/auth/steam', (req, res) => {
   if (!STEAM_API_KEY) {
-    return res.status(500).send('Укажите STEAM_API_KEY в переменных окружения (см. README.md)');
+    return res.status(500).send('Ошибка настройки: укажите STEAM_API_KEY в Environment на Render.');
   }
-  passport.authenticate('steam')(req, res, next);
+  const baseUrl = getBaseUrl(req);
+  const params = new URLSearchParams({
+    'openid.ns': 'http://specs.openid.net/auth/2.0',
+    'openid.mode': 'checkid_setup',
+    'openid.return_to': `${baseUrl}/auth/steam/return`,
+    'openid.realm': `${baseUrl}/`,
+    'openid.identity': 'http://specs.openid.net/auth/2.0/identifier_select',
+    'openid.claimed_id': 'http://specs.openid.net/auth/2.0/identifier_select'
+  });
+  console.log('Redirecting to Steam OpenID with return_to:', `${baseUrl}/auth/steam/return`);
+  res.redirect(`https://steamcommunity.com/openid/login?${params.toString()}`);
 });
 
-app.get('/auth/steam/return',
-  passport.authenticate('steam', { failureRedirect: '/?auth=failed' }),
-  (req, res) => res.redirect('/')
-);
+app.get('/auth/steam/return', async (req, res) => {
+  try {
+    const query = req.query || {};
+    if (query['openid.mode'] !== 'id_res') {
+      return res.redirect('/?auth=cancelled');
+    }
+
+    // Verify assertion directly with Steam
+    const verifyParams = new URLSearchParams();
+    for (const [k, v] of Object.entries(query)) {
+      verifyParams.append(k, String(v));
+    }
+    verifyParams.set('openid.mode', 'check_authentication');
+
+    const verifyRes = await fetch('https://steamcommunity.com/openid/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: verifyParams.toString()
+    });
+    const verifyText = await verifyRes.text();
+
+    if (!verifyText.includes('is_valid:true')) {
+      console.error('Steam OpenID verification failed:', verifyText);
+      return res.redirect('/?auth=invalid');
+    }
+
+    const claimedId = String(query['openid.claimed_id'] || '');
+    const match = claimedId.match(/\/openid\/id\/(\d+)$/);
+    if (!match) {
+      return res.redirect('/?auth=noid');
+    }
+    const steamId = match[1];
+
+    // Fetch real Steam profile info (nickname & avatar)
+    let name = `Steam_${steamId.slice(-6)}`;
+    let avatar = '';
+    let profileUrl = `https://steamcommunity.com/profiles/${steamId}`;
+
+    try {
+      const sumRes = await fetch(`https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=${encodeURIComponent(STEAM_API_KEY)}&steamids=${encodeURIComponent(steamId)}`);
+      const sumData = await sumRes.json();
+      const player = sumData && sumData.response && sumData.response.players && sumData.response.players[0];
+      if (player) {
+        name = player.personaname || name;
+        avatar = player.avatarfull || player.avatarmedium || player.avatar || '';
+        profileUrl = player.profileurl || profileUrl;
+      }
+    } catch (e) {
+      console.warn('Could not fetch Steam player summary:', e.message);
+    }
+
+    await pool.query(`
+      INSERT INTO users (steam_id, name, avatar, profile_url, created_at)
+      VALUES ($1, $2, $3, $4, $5)
+      ON CONFLICT (steam_id) DO UPDATE SET
+        name = EXCLUDED.name,
+        avatar = EXCLUDED.avatar,
+        profile_url = EXCLUDED.profile_url
+    `, [steamId, name, avatar, profileUrl, Date.now()]);
+
+    req.session.steamId = steamId;
+    req.session.save(() => {
+      res.redirect('/');
+    });
+  } catch (err) {
+    console.error('Steam auth return error:', err);
+    res.redirect('/?auth=error');
+  }
+});
 
 app.post('/api/logout', (req, res) => {
-  req.logout(() => res.json({ ok: true }));
+  req.session.destroy(() => {
+    res.json({ ok: true });
+  });
 });
 
 app.get('/api/me', (req, res) => {
@@ -373,7 +430,7 @@ app.post('/api/reviews/:id/comments', requireAuth, async (req, res) => {
 
 initDb()
   .then(() => {
-    app.listen(PORT, () => console.log(`AToQcritics server running at ${BASE_URL}`));
+    app.listen(PORT, () => console.log(`AToQcritics server running on port ${PORT}`));
   })
   .catch(err => {
     console.error('Не удалось инициализировать базу данных:', err);
