@@ -195,6 +195,13 @@ async function initDb() {
       text TEXT NOT NULL,
       created_at BIGINT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS reactions (
+      review_id TEXT NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
+      user_steam_id TEXT NOT NULL REFERENCES users(steam_id) ON DELETE CASCADE,
+      emoji TEXT NOT NULL,
+      PRIMARY KEY (review_id, user_steam_id, emoji)
+    );
   `);
   console.log('Облачная база PostgreSQL подключена и таблицы готовы.');
 }
@@ -421,7 +428,7 @@ app.get('/api/steam/search', requireAuth, async (req, res) => {
 
 // ==================== REVIEWS, VOTES & COMMENTS ====================
 async function hydrateReviews() {
-  const [revRes, voteRes, commRes] = await Promise.all([
+  const [revRes, voteRes, commRes, reactRes] = await Promise.all([
     pool.query(`
       SELECT r.*, u.name AS author_name, u.avatar AS author_avatar, u.profile_url AS author_url
       FROM reviews r
@@ -434,7 +441,8 @@ async function hydrateReviews() {
       FROM comments c
       JOIN users u ON u.steam_id = c.user_steam_id
       ORDER BY c.created_at ASC
-    `)
+    `),
+    pool.query('SELECT * FROM reactions')
   ]);
 
   const likesMap = {};
@@ -454,6 +462,12 @@ async function hydrateReviews() {
       text: c.text,
       createdAt: Number(c.created_at)
     });
+  });
+
+  const reactionsMap = {};
+  reactRes.rows.forEach(rx => {
+    const bucket = (reactionsMap[rx.review_id] ||= {});
+    (bucket[rx.emoji] ||= []).push(rx.user_steam_id);
   });
 
   return revRes.rows.map(r => ({
@@ -477,7 +491,8 @@ async function hydrateReviews() {
     createdAt: Number(r.created_at),
     likes: likesMap[r.id] || [],
     dislikes: dislikesMap[r.id] || [],
-    comments: commentsMap[r.id] || []
+    comments: commentsMap[r.id] || [],
+    reactions: reactionsMap[r.id] || {}
   }));
 }
 
@@ -525,6 +540,37 @@ app.post('/api/reviews', requireAuth, async (req, res) => {
   }
 });
 
+app.put('/api/reviews/:id', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT user_steam_id FROM reviews WHERE id = $1', [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Обзор не найден' });
+    if (rows[0].user_steam_id !== req.user.steam_id) return res.status(403).json({ error: 'Нет прав' });
+
+    const { scores, hoursPlayed, text } = req.body || {};
+    if (!text || !scores) {
+      return res.status(400).json({ error: 'Заполните текст и оценки' });
+    }
+    const clamp = v => Math.min(20, Math.max(0, Math.round(Number(v) || 0)));
+    const g = clamp(scores.gameplay);
+    const v = clamp(scores.visuals);
+    const n = clamp(scores.narrative);
+    const a = clamp(scores.audio);
+    const e = clamp(scores.emotions);
+    const total = g + v + n + a + e;
+    const hrs = hoursPlayed !== null && hoursPlayed !== '' && !Number.isNaN(Number(hoursPlayed)) ? Number(hoursPlayed) : null;
+
+    await pool.query(`
+      UPDATE reviews
+      SET gameplay = $1, visuals = $2, narrative = $3, audio = $4, emotions = $5, total = $6, hours_played = $7, text = $8
+      WHERE id = $9
+    `, [g, v, n, a, e, total, hrs, String(text).trim().slice(0, 2000), req.params.id]);
+
+    res.json({ ok: true, reviews: await hydrateReviews() });
+  } catch (err) {
+    res.status(500).json({ error: 'Ошибка обновления обзора' });
+  }
+});
+
 app.delete('/api/reviews/:id', requireAuth, async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT user_steam_id FROM reviews WHERE id = $1', [req.params.id]);
@@ -554,6 +600,35 @@ app.post('/api/reviews/:id/vote', requireAuth, async (req, res) => {
     res.json({ reviews: await hydrateReviews() });
   } catch (err) {
     res.status(500).json({ error: 'Ошибка голосования' });
+  }
+});
+
+const ALLOWED_EMOJIS = ['🔥', '❤️', '😂', '🤯', '💯', '👑', '💀', '🤡', '😢', '⚡', '🎯', '🫡'];
+
+app.post('/api/reviews/:id/react', requireAuth, async (req, res) => {
+  try {
+    const emoji = String((req.body && req.body.emoji) || '').trim();
+    if (!ALLOWED_EMOJIS.includes(emoji)) {
+      return res.status(400).json({ error: 'Неподдерживаемый эмодзи' });
+    }
+    const { rows } = await pool.query(
+      'SELECT 1 FROM reactions WHERE review_id = $1 AND user_steam_id = $2 AND emoji = $3',
+      [req.params.id, req.user.steam_id, emoji]
+    );
+    if (rows[0]) {
+      await pool.query(
+        'DELETE FROM reactions WHERE review_id = $1 AND user_steam_id = $2 AND emoji = $3',
+        [req.params.id, req.user.steam_id, emoji]
+      );
+    } else {
+      await pool.query(
+        'INSERT INTO reactions (review_id, user_steam_id, emoji) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+        [req.params.id, req.user.steam_id, emoji]
+      );
+    }
+    res.json({ reviews: await hydrateReviews() });
+  } catch (err) {
+    res.status(500).json({ error: 'Ошибка реакции' });
   }
 });
 
