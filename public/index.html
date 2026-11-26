@@ -191,7 +191,7 @@
       { key: 'audio', label: 'Аудио', color: '#a78bfa' },
       { key: 'emotions', label: 'Эмоции', color: '#fb923c' }
     ];
-    let currentUser = null, users = [], reviews = [], myLibrary = [], libraryPrivate = false;
+    let currentUser = null, users = [], reviews = [], myLibrary = [], libraryPrivate = false, libraryError = '';
     let activeView = 'feed', profileUserId = null, searchTab = 'all', selectedGame = null;
     let modalScores = { gameplay: 16, visuals: 16, narrative: 16, audio: 16, emotions: 16 };
     let openComments = {}, searchTimer = null;
@@ -241,6 +241,7 @@
         const d = await r.json();
         myLibrary = d.games || [];
         libraryPrivate = Boolean(d.isPrivate);
+        libraryError = d.apiError || '';
       }
     }
 
@@ -350,13 +351,24 @@
       const status = document.getElementById('steam-search-status');
       const box = document.getElementById('steam-search-results');
       if (searchTab === 'library') {
-        if (libraryPrivate) {
-          status.textContent = 'Библиотека Steam скрыта настройками приватности. Откройте доступ к «Информации об играх» в настройках профиля Steam, чтобы видеть свою библиотеку здесь.';
+        if (libraryError && !myLibrary.length) {
+          status.innerHTML = `<span class="text-rose-300">${esc(libraryError)}</span> <button type="button" id="btn-retry-lib" class="ml-2 underline text-[#d9ff00] cursor-pointer">Обновить</button>`;
           box.innerHTML = '';
+          const retry = document.getElementById('btn-retry-lib');
+          if (retry) retry.onclick = async () => { status.textContent = 'Загрузка библиотеки Steam...'; await loadMyLibrary(); renderSearchResults(); };
+          return;
+        }
+        if (libraryPrivate && !myLibrary.length) {
+          status.innerHTML = `Библиотека Steam скрыта настройками приватности. Откройте доступ к «Информации об играх» в настройках профиля Steam. <button type="button" id="btn-retry-lib" class="ml-2 underline text-[#d9ff00] cursor-pointer">Обновить</button>`;
+          box.innerHTML = '';
+          const retry = document.getElementById('btn-retry-lib');
+          if (retry) retry.onclick = async () => { status.textContent = 'Загрузка библиотеки Steam...'; await loadMyLibrary(); renderSearchResults(); };
           return;
         }
         const filtered = myLibrary.filter(g => !q || g.title.toLowerCase().includes(q.toLowerCase())).slice(0, 40);
-        status.textContent = `В вашей библиотеке Steam: ${myLibrary.length} игр`;
+        status.innerHTML = `В вашей библиотеке Steam: ${myLibrary.length} игр <button type="button" id="btn-retry-lib" class="ml-2 underline text-[#66c0f4] cursor-pointer">Обновить</button>`;
+        const retry = document.getElementById('btn-retry-lib');
+        if (retry) retry.onclick = async () => { status.textContent = 'Обновление библиотеки Steam...'; await loadMyLibrary(); renderSearchResults(); };
         box.innerHTML = filtered.map(g => `<button type="button" data-pick-game='${esc(JSON.stringify(g))}' class="rounded-2xl bg-white/[0.05] hover:bg-white/[0.1] p-2.5 flex items-center gap-3 text-left cursor-pointer"><img src="${esc(g.img)}" class="w-20 h-10 rounded-xl object-cover" /><div class="min-w-0"><div class="text-xs font-bold truncate">${esc(g.title)}</div><div class="text-[11px] text-[#66c0f4]">${g.hoursPlayed} ч. в Steam</div></div></button>`).join('');
         return;
       }
