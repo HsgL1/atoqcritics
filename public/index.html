@@ -30,7 +30,7 @@
       box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), 0 18px 42px rgba(0,0,0,0.42);
     }
     .liquid-glass-strong {
-      background: linear-gradient(145deg, rgba(22,30,44,0.88), rgba(13,18,28,0.94));
+      background: linear-gradient(145deg, rgba(22,30,44,0.90), rgba(13,18,28,0.95));
       backdrop-filter: blur(34px) saturate(180%); -webkit-backdrop-filter: blur(34px) saturate(180%);
       border: 1px solid rgba(255,255,255,0.16);
       box-shadow: inset 0 1px 0 rgba(255,255,255,0.26), 0 24px 64px rgba(0,0,0,0.65);
@@ -50,13 +50,12 @@
     .liquid-pill {
       background: rgba(255,255,255,0.06);
       border: 1px solid rgba(255,255,255,0.12);
-      transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1), background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+      transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1), background 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
     }
     .liquid-pill:hover { background: rgba(255,255,255,0.11); border-color: rgba(255,255,255,0.22); }
-    .liquid-pill:active { transform: scale(0.95); }
+    .liquid-pill:active { transform: scale(0.94); }
     .liquid-pill-active { background: linear-gradient(135deg, rgba(102,192,244,0.24), rgba(217,255,0,0.16)); border-color: rgba(217,255,0,0.45); color: #fff; }
 
-    /* Solid cohesive brand color fitting Liquid Glass + Steam palette */
     .atoq-wordmark {
       color: #eaf4ff;
       text-shadow: 0 0 22px rgba(102, 192, 244, 0.28);
@@ -78,14 +77,54 @@
     .btn-steam:hover { transform: translateY(-1px); border-color: rgba(102,192,244,0.85); box-shadow: 0 12px 30px rgba(102,192,244,0.22); }
     .btn-steam:active { transform: scale(0.97); }
 
-    input[type="range"].criteria-slider { -webkit-appearance: none; appearance: none; width: 100%; height: 8px; border-radius: 999px; background: rgba(255,255,255,0.1); cursor: pointer; }
-    input[type="range"].criteria-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 999px; background: linear-gradient(135deg, #fff, #d9ff00); border: 2px solid #090c12; transition: transform 0.15s ease; }
-    input[type="range"].criteria-slider::-webkit-slider-thumb:hover { transform: scale(1.15); }
-    .score-ring { background: conic-gradient(var(--ring-color, #d9ff00) calc(var(--pct, 0) * 1%), rgba(255,255,255,0.08) 0); transition: background 0.25s ease; }
+    /* Silky-smooth continuous criteria slider */
+    input[type="range"].criteria-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.1);
+      outline: none;
+      cursor: pointer;
+    }
+    input[type="range"].criteria-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #ffffff 0%, #eaf4ff 60%, #d9ff00 100%);
+      border: 2px solid #090c12;
+      box-shadow: 0 0 14px rgba(217,255,0,0.45), 0 2px 6px rgba(0,0,0,0.45);
+      transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.16s ease;
+    }
+    input[type="range"].criteria-slider::-webkit-slider-thumb:hover {
+      transform: scale(1.16);
+      box-shadow: 0 0 18px rgba(217,255,0,0.65), 0 3px 10px rgba(0,0,0,0.55);
+    }
+    input[type="range"].criteria-slider:active::-webkit-slider-thumb {
+      transform: scale(1.24);
+    }
+    input[type="range"].criteria-slider::-moz-range-thumb {
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #ffffff 0%, #eaf4ff 60%, #d9ff00 100%);
+      border: 2px solid #090c12;
+      box-shadow: 0 0 14px rgba(217,255,0,0.45);
+      transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .score-ring { background: conic-gradient(var(--ring-color, #d9ff00) calc(var(--pct, 0) * 1%), rgba(255,255,255,0.08) 0); }
 
     /* Smooth Liquid Glass Animations */
     @keyframes fadeSlideUp {
       from { opacity: 0; transform: translateY(14px) scale(0.985); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes gameItemIn {
+      from { opacity: 0; transform: translateY(10px) scale(0.96); }
       to { opacity: 1; transform: translateY(0) scale(1); }
     }
     @keyframes modalBackdropIn {
@@ -93,13 +132,25 @@
       to { opacity: 1; }
     }
     @keyframes modalPanelIn {
-      from { opacity: 0; transform: translateY(20px) scale(0.96); }
+      from { opacity: 0; transform: translateY(22px) scale(0.95); }
       to { opacity: 1; transform: translateY(0) scale(1); }
     }
+    @keyframes stepSlideInRight {
+      from { opacity: 0; transform: translateX(22px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes stepSlideInLeft {
+      from { opacity: 0; transform: translateX(-22px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
     @keyframes popBounce {
-      0% { transform: scale(1); }
-      45% { transform: scale(1.18); }
+      0% { transform: scale(0.82); }
+      50% { transform: scale(1.16); }
       100% { transform: scale(1); }
+    }
+    @keyframes popoverIn {
+      from { opacity: 0; transform: translateY(8px) scale(0.92); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
     }
     @keyframes drawerExpand {
       from { opacity: 0; transform: translateY(-6px); }
@@ -107,17 +158,27 @@
     }
     .anim-view { animation: fadeSlideUp 0.34s cubic-bezier(0.22, 1, 0.36, 1) both; }
     .anim-card { animation: fadeSlideUp 0.36s cubic-bezier(0.22, 1, 0.36, 1) both; }
+    .anim-game-item { animation: gameItemIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) both; }
     .anim-modal-bg { animation: modalBackdropIn 0.22s ease both; }
-    .anim-modal-panel { animation: modalPanelIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) both; }
-    .anim-pop { animation: popBounce 0.28s cubic-bezier(0.22, 1, 0.36, 1); }
+    .anim-modal-panel { animation: modalPanelIn 0.3s cubic-bezier(0.22, 1, 0.36, 1) both; }
+    .anim-step-right { animation: stepSlideInRight 0.28s cubic-bezier(0.22, 1, 0.36, 1) both; }
+    .anim-step-left { animation: stepSlideInLeft 0.28s cubic-bezier(0.22, 1, 0.36, 1) both; }
+    .anim-pop { animation: popBounce 0.32s cubic-bezier(0.22, 1, 0.36, 1) both; }
+    .anim-popover { animation: popoverIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) both; }
     .anim-drawer { animation: drawerExpand 0.24s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+    .emoji-btn {
+      transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1), background 0.15s ease;
+    }
+    .emoji-btn:hover { transform: scale(1.26) translateY(-2px); background: rgba(255,255,255,0.12); }
+    .emoji-btn:active { transform: scale(0.92); }
   </style>
 </head>
 <body>
   <div class="ambient-bg" aria-hidden="true"></div>
   <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
-  <!-- INITIAL SPLASH LOADER (prevents flash of auth screen when already logged in) -->
+  <!-- INITIAL SPLASH LOADER -->
   <div id="boot-loader" class="relative z-30 min-h-screen flex flex-col items-center justify-center gap-4 p-4">
     <div class="relative">
       <div class="w-16 h-16 rounded-2xl overflow-hidden border border-white/20 shadow-2xl">
@@ -128,7 +189,7 @@
     <div class="text-xs text-slate-400 tracking-wide">Загрузка AToQcritics...</div>
   </div>
 
-  <!-- REAL STEAM AUTH SCREEN (hidden until /api/me confirms user is NOT logged in) -->
+  <!-- REAL STEAM AUTH SCREEN -->
   <section id="auth-screen" class="hidden relative z-20 min-h-screen flex items-center justify-center p-4">
     <div class="liquid-glass-strong anim-modal-panel w-full max-w-lg rounded-[32px] p-7 sm:p-9 text-center">
       <div class="relative inline-block mb-5">
@@ -207,33 +268,33 @@
     </main>
   </div>
 
-  <!-- MODAL: NEW REVIEW (LIVE STEAM SEARCH + REAL USER LIBRARY) -->
+  <!-- MODAL: NEW REVIEW -->
   <div id="review-modal" class="hidden fixed inset-0 z-40 flex items-center justify-center p-3 sm:p-5 bg-black/75 backdrop-blur-md anim-modal-bg">
     <div class="liquid-glass-strong anim-modal-panel w-full max-w-2xl max-h-[92vh] rounded-[30px] flex flex-col overflow-hidden">
       <div class="px-6 py-4 border-b border-white/10 flex items-center justify-between">
         <div>
-          <h2 class="text-lg font-bold">Новый обзор</h2>
+          <h2 id="modal-title" class="text-lg font-bold">Новый обзор</h2>
           <p id="modal-subtitle" class="text-xs text-slate-400">Поиск по всему каталогу Steam или вашей библиотеке</p>
         </div>
         <button id="btn-close-modal" type="button" class="liquid-pill p-2 rounded-full cursor-pointer"><i data-lucide="x" class="w-4 h-4"></i></button>
       </div>
       <div class="p-6 overflow-y-auto flex-1 space-y-4">
-        <div id="modal-step-search" class="space-y-4 anim-view">
-          <div class="flex gap-2">
+        <div id="modal-step-search" class="space-y-4">
+          <div class="flex gap-2 p-1 rounded-full bg-white/[0.04] border border-white/10 w-fit">
             <button id="tab-all-steam" type="button" class="liquid-pill liquid-pill-active px-4 py-2 rounded-full text-xs font-semibold cursor-pointer">Весь каталог Steam</button>
             <button id="tab-my-library" type="button" class="liquid-pill px-4 py-2 rounded-full text-xs font-semibold cursor-pointer">Моя библиотека Steam</button>
           </div>
           <input id="steam-game-search" type="text" placeholder="Введите название любой игры в Steam..." class="w-full px-4 py-3 rounded-2xl bg-white/[0.07] border border-white/15 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#d9ff00] transition" />
           <div id="steam-search-status" class="text-xs text-slate-400"></div>
-          <div id="steam-search-results" class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[48vh] overflow-y-auto"></div>
+          <div id="steam-search-results" class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[48vh] overflow-y-auto pr-1"></div>
         </div>
 
-        <form id="review-form" class="hidden space-y-4 anim-view">
+        <form id="review-form" class="hidden space-y-4">
           <div id="selected-game-banner" class="rounded-2xl bg-white/[0.05] border border-white/12 p-3 flex items-center justify-between gap-3"></div>
           <div class="rounded-2xl bg-white/[0.06] border border-white/15 p-4 flex items-center justify-between">
             <div>
               <div class="text-xs uppercase text-slate-400">Итоговая оценка</div>
-              <div id="live-score-tier" class="text-sm font-bold text-[#d9ff00]">Отлично</div>
+              <div id="live-score-tier" class="text-sm font-bold text-[#d9ff00] transition-colors duration-200">Отлично</div>
             </div>
             <div id="live-score-ring" class="score-ring w-16 h-16 rounded-full p-[3px] flex items-center justify-center" style="--pct:80;--ring-color:#d9ff00;">
               <div class="w-full h-full rounded-full bg-[#0e1420] flex items-center justify-center">
@@ -242,8 +303,8 @@
             </div>
           </div>
           <div id="criteria-sliders-container" class="space-y-3"></div>
-          <input id="input-hours" type="number" step="0.1" min="0" placeholder="Часов в Steam (подтягивается из библиотеки)" class="w-full px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/15 text-sm text-white" />
-          <textarea id="input-review-text" rows="4" required maxlength="2000" placeholder="Текст вашей рецензии..." class="w-full px-4 py-3 rounded-2xl bg-white/[0.06] border border-white/15 text-sm text-white"></textarea>
+          <input id="input-hours" type="number" step="0.1" min="0" placeholder="Часов в Steam (подтягивается из библиотеки)" class="w-full px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/15 text-sm text-white focus:outline-none focus:border-[#66c0f4] transition" />
+          <textarea id="input-review-text" rows="4" required maxlength="2000" placeholder="Текст вашей рецензии..." class="w-full px-4 py-3 rounded-2xl bg-white/[0.06] border border-white/15 text-sm text-white focus:outline-none focus:border-[#d9ff00] transition"></textarea>
           <div class="flex justify-end gap-2">
             <button id="btn-cancel-review" type="button" class="liquid-pill px-5 py-2.5 rounded-full text-sm cursor-pointer">Отмена</button>
             <button id="btn-publish-review" type="submit" class="btn-acid px-6 py-2.5 rounded-full text-sm cursor-pointer">Опубликовать</button>
@@ -261,14 +322,21 @@
       { key: 'audio', label: 'Аудио', color: '#a78bfa' },
       { key: 'emotions', label: 'Эмоции', color: '#fb923c' }
     ];
+    const EMOJI_PALETTE = ['🔥', '❤️', '😂', '🤯', '💯', '👑', '💀', '🤡', '😢', '⚡', '🎯', '🫡'];
+
     let currentUser = null, users = [], reviews = [], myLibrary = [], libraryPrivate = false, libraryError = '';
-    let activeView = 'feed', profileUserId = null, searchTab = 'all', selectedGame = null;
+    let activeView = 'feed', profileUserId = null, searchTab = 'all', selectedGame = null, editingReviewId = null;
     let lastDisplayedGames = [];
     let modalScores = { gameplay: 16, visuals: 16, narrative: 16, audio: 16, emotions: 16 };
-    let openComments = {}, searchTimer = null;
+    let openComments = {}, openEmojiPickerId = null, lastAnimatedReaction = null, searchTimer = null;
 
     const esc = s => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
     const scoreMeta = s => s >= 90 ? { l: 'Шедевр', c: '#d9ff00' } : s >= 75 ? { l: 'Отлично', c: '#5ce1e6' } : s >= 55 ? { l: 'Неплохо', c: '#fbbf24' } : { l: 'Слабо', c: '#fb7185' };
+
+    function sliderTrackBg(val, color) {
+      const pct = Math.min(100, Math.max(0, (Number(val) / 20) * 100));
+      return `linear-gradient(to right, ${color} 0%, ${color} ${pct}%, rgba(255,255,255,0.10) ${pct}%, rgba(255,255,255,0.10) 100%)`;
+    }
 
     function showToast(msg) {
       const box = document.getElementById('toast-container');
@@ -345,9 +413,29 @@
       const disliked = rev.dislikes.includes(currentUser.steam_id);
       const own = rev.userId === currentUser.steam_id;
       const cOpen = Boolean(openComments[rev.id]);
+      const pickerOpen = openEmojiPickerId === rev.id;
       const delay = Math.min(idx * 40, 240);
+      const reactions = rev.reactions || {};
+      const activeReactionPills = Object.entries(reactions)
+        .filter(([, list]) => Array.isArray(list) && list.length > 0)
+        .map(([emoji, list]) => {
+          const mine = list.includes(currentUser.steam_id);
+          const isFresh = lastAnimatedReaction === `${rev.id}:${emoji}`;
+          return `
+            <button
+              type="button"
+              data-react-review="${esc(rev.id)}"
+              data-emoji="${esc(emoji)}"
+              class="liquid-pill ${isFresh ? 'anim-pop' : ''} px-2.5 py-1 rounded-full text-xs flex items-center gap-1 cursor-pointer ${mine ? 'border-[#d9ff00]/60 bg-[#d9ff00]/15 text-[#d9ff00]' : 'text-slate-200'}"
+            >
+              <span>${emoji}</span>
+              <span class="font-semibold">${list.length}</span>
+            </button>
+          `;
+        }).join('');
+
       return `
-        <article class="liquid-card anim-card rounded-[26px] p-5 space-y-4" style="animation-delay:${delay}ms;">
+        <article class="liquid-card anim-card rounded-[26px] p-5 space-y-4 relative" style="animation-delay:${delay}ms;">
           <div class="flex flex-col sm:flex-row gap-4">
             <a href="https://store.steampowered.com/app/${rev.appId}/" target="_blank" rel="noopener" class="sm:w-52 aspect-[460/215] rounded-2xl overflow-hidden border border-white/15 shrink-0 block group">
               <img src="${esc(rev.gameImg)}" alt="${esc(rev.gameTitle)}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
@@ -376,12 +464,35 @@
             ${CRITERIA.map(c => `<div class="rounded-xl bg-white/[0.04] px-2.5 py-2 text-xs"><div class="flex justify-between"><span>${c.label}</span><b>${rev.scores[c.key]}/20</b></div><div class="h-1.5 rounded-full bg-white/10 mt-1 overflow-hidden"><div class="h-full rounded-full transition-all duration-500" style="width:${(rev.scores[c.key]/20)*100}%;background:${c.color}"></div></div></div>`).join('')}
           </div>
           <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/10">
-            <div class="flex gap-2">
+            <div class="flex flex-wrap items-center gap-2 relative">
               <button type="button" data-vote="${rev.id}" data-val="1" class="liquid-pill px-3 py-1.5 rounded-full text-xs cursor-pointer ${liked ? 'text-[#d9ff00] border-[#d9ff00]/60 bg-[#d9ff00]/10' : ''}">👍 ${rev.likes.length}</button>
               <button type="button" data-vote="${rev.id}" data-val="-1" class="liquid-pill px-3 py-1.5 rounded-full text-xs cursor-pointer ${disliked ? 'text-rose-400 border-rose-400/60 bg-rose-500/10' : ''}">👎 ${rev.dislikes.length}</button>
+
+              ${activeReactionPills}
+
+              <div class="relative">
+                <button
+                  type="button"
+                  data-toggle-emoji-picker="${esc(rev.id)}"
+                  title="Добавить реакцию"
+                  class="liquid-pill px-2.5 py-1.5 rounded-full text-xs cursor-pointer flex items-center gap-1 ${pickerOpen ? 'border-[#66c0f4]/60 bg-[#66c0f4]/15 text-white' : 'text-slate-300'}"
+                >
+                  <span>😀</span>
+                  <span class="text-[11px]">+</span>
+                </button>
+                ${pickerOpen ? `
+                  <div class="anim-popover absolute left-0 bottom-full mb-2 z-30 liquid-glass-strong rounded-2xl p-2 flex flex-wrap gap-1 w-56 shadow-2xl">
+                    ${EMOJI_PALETTE.map(em => {
+                      const chosen = Array.isArray(reactions[em]) && reactions[em].includes(currentUser.steam_id);
+                      return `<button type="button" data-react-review="${esc(rev.id)}" data-emoji="${em}" class="emoji-btn w-8 h-8 rounded-xl flex items-center justify-center text-base cursor-pointer ${chosen ? 'bg-[#d9ff00]/20 ring-1 ring-[#d9ff00]/60' : ''}">${em}</button>`;
+                    }).join('')}
+                  </div>
+                ` : ''}
+              </div>
+
               <button type="button" data-toggle-comments="${rev.id}" class="liquid-pill px-3 py-1.5 rounded-full text-xs cursor-pointer ${cOpen ? 'text-[#66c0f4] border-[#66c0f4]/50' : ''}">💬 Комментарии (${rev.comments.length})</button>
             </div>
-            ${own ? `<button type="button" data-del-review="${rev.id}" class="liquid-pill px-3 py-1.5 rounded-full text-xs text-rose-300 hover:border-rose-400/50 cursor-pointer">Удалить</button>` : ''}
+            ${own ? `<div class="flex items-center gap-1.5"><button type="button" data-edit-review="${rev.id}" class="liquid-pill px-3 py-1.5 rounded-full text-xs text-slate-200 hover:text-white cursor-pointer">✏️ Изменить</button><button type="button" data-del-review="${rev.id}" class="liquid-pill px-3 py-1.5 rounded-full text-xs text-rose-300 hover:border-rose-400/50 cursor-pointer">Удалить</button></div>` : ''}
           </div>
           ${cOpen ? `
             <div class="anim-drawer rounded-2xl bg-black/30 border border-white/10 p-3 space-y-2.5">
@@ -443,15 +554,18 @@
 
     function renderGameButtons(gamesList, showHours) {
       lastDisplayedGames = gamesList;
-      return gamesList.map((g, idx) => `
-        <button type="button" data-pick-idx="${idx}" class="liquid-pill rounded-2xl bg-white/[0.05] hover:bg-white/[0.11] p-2.5 flex items-center gap-3 text-left cursor-pointer group">
-          <img src="${esc(g.img)}" alt="${esc(g.title)}" class="w-20 h-10 rounded-xl object-cover shrink-0 group-hover:scale-105 transition" />
-          <div class="min-w-0">
-            <div class="text-xs font-bold truncate group-hover:text-[#d9ff00] transition">${esc(g.title)}</div>
-            <div class="text-[11px] ${showHours ? 'text-[#66c0f4]' : 'text-slate-400'}">${showHours ? `${g.hoursPlayed} ч. в Steam` : `Steam #${g.appId}`}</div>
-          </div>
-        </button>
-      `).join('');
+      return gamesList.map((g, idx) => {
+        const delay = Math.min(idx * 24, 240);
+        return `
+          <button type="button" data-pick-idx="${idx}" style="animation-delay:${delay}ms;" class="anim-game-item liquid-pill rounded-2xl bg-white/[0.05] hover:bg-white/[0.11] hover:-translate-y-0.5 p-2.5 flex items-center gap-3 text-left cursor-pointer group">
+            <img src="${esc(g.img)}" alt="${esc(g.title)}" class="w-20 h-10 rounded-xl object-cover shrink-0 group-hover:scale-105 transition duration-200" />
+            <div class="min-w-0">
+              <div class="text-xs font-bold truncate group-hover:text-[#d9ff00] transition">${esc(g.title)}</div>
+              <div class="text-[11px] ${showHours ? 'text-[#66c0f4]' : 'text-slate-400'}">${showHours ? `${g.hoursPlayed} ч. в Steam` : `Steam #${g.appId}`}</div>
+            </div>
+          </button>
+        `;
+      }).join('');
     }
 
     async function renderSearchResults() {
@@ -495,34 +609,81 @@
 
     function openRateStep(game) {
       selectedGame = game;
-      document.getElementById('modal-step-search').classList.add('hidden');
+      const searchStep = document.getElementById('modal-step-search');
       const form = document.getElementById('review-form');
-      form.classList.remove('hidden');
-      document.getElementById('selected-game-banner').innerHTML = `<div class="flex items-center gap-3 min-w-0"><img src="${esc(game.img)}" class="w-20 h-10 rounded-xl object-cover shrink-0" /><div class="min-w-0"><div class="text-sm font-bold truncate">${esc(game.title)}</div><div class="text-xs text-slate-400">Steam #${game.appId}</div></div></div><button type="button" id="btn-back-search" class="liquid-pill px-3 py-1.5 rounded-full text-xs cursor-pointer shrink-0">Сменить</button>`;
-      document.getElementById('btn-back-search').onclick = () => { form.classList.add('hidden'); document.getElementById('modal-step-search').classList.remove('hidden'); };
-      const owned = myLibrary.find(x => Number(x.appId) === Number(game.appId));
-      document.getElementById('input-hours').value = owned ? owned.hoursPlayed : (game.hoursPlayed || '');
-      document.getElementById('criteria-sliders-container').innerHTML = CRITERIA.map(c => `<div class="rounded-2xl bg-white/[0.04] px-4 py-3 space-y-1.5"><div class="flex justify-between text-sm"><span>${c.label}</span><b id="cv-${c.key}" style="color:${c.color}">${modalScores[c.key]} / 20</b></div><input type="range" min="0" max="20" value="${modalScores[c.key]}" data-crit="${c.key}" class="criteria-slider" /></div>`).join('');
+      searchStep.classList.add('hidden');
+      form.classList.remove('hidden', 'anim-step-right');
+      void form.offsetWidth;
+      form.classList.add('anim-step-right');
+
+      document.getElementById('selected-game-banner').innerHTML = `<div class="flex items-center gap-3 min-w-0"><img src="${esc(game.img)}" class="w-20 h-10 rounded-xl object-cover shrink-0" /><div class="min-w-0"><div class="text-sm font-bold truncate">${esc(game.title)}</div><div class="text-xs text-slate-400">Steam #${game.appId}</div></div></div>${editingReviewId ? '' : '<button type="button" id="btn-back-search" class="liquid-pill px-3 py-1.5 rounded-full text-xs cursor-pointer shrink-0">Сменить</button>'}`;
+      const backBtn = document.getElementById('btn-back-search');
+      if (backBtn) {
+        backBtn.onclick = () => {
+          form.classList.add('hidden');
+          searchStep.classList.remove('hidden', 'anim-step-left');
+          void searchStep.offsetWidth;
+          searchStep.classList.add('anim-step-left');
+        };
+      }
+      if (!editingReviewId) {
+        const owned = myLibrary.find(x => Number(x.appId) === Number(game.appId));
+        document.getElementById('input-hours').value = owned ? owned.hoursPlayed : (game.hoursPlayed || '');
+      }
+      document.getElementById('criteria-sliders-container').innerHTML = CRITERIA.map(c => {
+        const val = modalScores[c.key];
+        return `
+          <div class="rounded-2xl bg-white/[0.04] border border-white/[0.08] px-4 py-3 space-y-2 transition hover:border-white/15">
+            <div class="flex justify-between text-sm">
+              <span class="font-medium">${c.label}</span>
+              <b id="cv-${c.key}" style="color:${c.color}">${Math.round(val)} / 20</b>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="20"
+              step="0.05"
+              value="${val}"
+              data-crit="${c.key}"
+              data-color="${c.color}"
+              style="background:${sliderTrackBg(val, c.color)};"
+              class="criteria-slider"
+            />
+          </div>
+        `;
+      }).join('');
       updateScore();
     }
 
     function updateScore() {
-      const total = CRITERIA.reduce((s,c) => s + Number(modalScores[c.key]), 0);
-      const m = scoreMeta(total);
-      document.getElementById('live-score-number').textContent = total;
+      const smoothTotal = CRITERIA.reduce((s, c) => s + Number(modalScores[c.key]), 0);
+      const displayTotal = CRITERIA.reduce((s, c) => s + Math.round(Number(modalScores[c.key])), 0);
+      const m = scoreMeta(displayTotal);
+      document.getElementById('live-score-number').textContent = displayTotal;
       document.getElementById('live-score-tier').textContent = m.l;
       document.getElementById('live-score-tier').style.color = m.c;
       const ring = document.getElementById('live-score-ring');
-      ring.style.setProperty('--pct', total);
+      ring.style.setProperty('--pct', smoothTotal);
       ring.style.setProperty('--ring-color', m.c);
     }
 
-    document.getElementById('nav-brand').onclick = document.getElementById('nav-feed').onclick = document.getElementById('btn-back-to-feed').onclick = () => { activeView = 'feed'; renderApp(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
-    document.getElementById('nav-profile').onclick = () => { activeView = 'profile'; profileUserId = currentUser.steam_id; renderApp(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+    document.getElementById('nav-brand').onclick = document.getElementById('nav-feed').onclick = document.getElementById('btn-back-to-feed').onclick = () => { activeView = 'feed'; openEmojiPickerId = null; renderApp(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+    document.getElementById('nav-profile').onclick = () => { activeView = 'profile'; profileUserId = currentUser.steam_id; openEmojiPickerId = null; renderApp(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
     document.getElementById('btn-logout').onclick = async () => { await fetch('/api/logout', { method: 'POST' }); location.reload(); };
     document.getElementById('btn-new-review').onclick = () => {
+      openEmojiPickerId = null;
+      editingReviewId = null;
+      modalScores = { gameplay: 16, visuals: 16, narrative: 16, audio: 16, emotions: 16 };
+      document.getElementById('modal-title').textContent = 'Новый обзор';
+      document.getElementById('modal-subtitle').textContent = 'Поиск по всему каталогу Steam или вашей библиотеке';
+      document.getElementById('btn-publish-review').textContent = 'Опубликовать';
+      document.getElementById('input-review-text').value = '';
+      document.getElementById('input-hours').value = '';
       document.getElementById('review-modal').classList.remove('hidden');
-      document.getElementById('modal-step-search').classList.remove('hidden');
+      const searchStep = document.getElementById('modal-step-search');
+      searchStep.classList.remove('hidden', 'anim-step-left');
+      void searchStep.offsetWidth;
+      searchStep.classList.add('anim-step-left');
       document.getElementById('review-form').classList.add('hidden');
       renderSearchResults();
     };
@@ -530,48 +691,107 @@
     document.getElementById('review-modal').onclick = e => { if (e.target.id === 'review-modal') document.getElementById('review-modal').classList.add('hidden'); };
     document.getElementById('tab-all-steam').onclick = () => { searchTab = 'all'; document.getElementById('tab-all-steam').classList.add('liquid-pill-active'); document.getElementById('tab-my-library').classList.remove('liquid-pill-active'); renderSearchResults(); };
     document.getElementById('tab-my-library').onclick = () => { searchTab = 'library'; document.getElementById('tab-my-library').classList.add('liquid-pill-active'); document.getElementById('tab-all-steam').classList.remove('liquid-pill-active'); renderSearchResults(); };
-    document.getElementById('steam-game-search').oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(renderSearchResults, 260); };
+    document.getElementById('steam-game-search').oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(renderSearchResults, 240); };
     document.getElementById('steam-search-results').onclick = e => {
       const b = e.target.closest('[data-pick-idx]');
       if (!b) return;
       const g = lastDisplayedGames[Number(b.dataset.pickIdx)];
       if (g) openRateStep(g);
     };
-    document.getElementById('criteria-sliders-container').oninput = e => { if (e.target.dataset.crit) { modalScores[e.target.dataset.crit] = Number(e.target.value); document.getElementById('cv-' + e.target.dataset.crit).textContent = `${e.target.value} / 20`; updateScore(); } };
+    document.getElementById('criteria-sliders-container').oninput = e => {
+      const key = e.target.dataset.crit;
+      if (!key) return;
+      const rawVal = Number(e.target.value);
+      modalScores[key] = rawVal;
+      e.target.style.background = sliderTrackBg(rawVal, e.target.dataset.color || '#d9ff00');
+      document.getElementById('cv-' + key).textContent = `${Math.round(rawVal)} / 20`;
+      updateScore();
+    };
     document.getElementById('review-form').onsubmit = async e => {
       e.preventDefault();
       const pubBtn = document.getElementById('btn-publish-review');
       pubBtn.disabled = true;
-      pubBtn.textContent = 'Публикация...';
+      const isEdit = Boolean(editingReviewId);
+      pubBtn.textContent = isEdit ? 'Сохранение...' : 'Публикация...';
       try {
-        const r = await fetch('/api/reviews', {
-          method: 'POST',
+        const roundedScores = {};
+        CRITERIA.forEach(c => { roundedScores[c.key] = Math.round(Number(modalScores[c.key])); });
+        const url = isEdit ? `/api/reviews/${editingReviewId}` : '/api/reviews';
+        const method = isEdit ? 'PUT' : 'POST';
+        const payload = isEdit
+          ? {
+              scores: roundedScores,
+              hoursPlayed: document.getElementById('input-hours').value,
+              text: document.getElementById('input-review-text').value
+            }
+          : {
+              appId: selectedGame.appId,
+              gameTitle: selectedGame.title,
+              gameImg: selectedGame.img,
+              scores: roundedScores,
+              hoursPlayed: document.getElementById('input-hours').value,
+              text: document.getElementById('input-review-text').value
+            };
+        const r = await fetch(url, {
+          method,
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            appId: selectedGame.appId,
-            gameTitle: selectedGame.title,
-            gameImg: selectedGame.img,
-            scores: modalScores,
-            hoursPlayed: document.getElementById('input-hours').value,
-            text: document.getElementById('input-review-text').value
-          })
+          body: JSON.stringify(payload)
         });
         if (r.ok) {
           reviews = (await r.json()).reviews;
+          editingReviewId = null;
           document.getElementById('review-modal').classList.add('hidden');
           document.getElementById('input-review-text').value = '';
           renderApp();
-          showToast('Обзор опубликован!');
+          showToast(isEdit ? 'Обзор обновлён!' : 'Обзор опубликован!');
         }
       } finally {
         pubBtn.disabled = false;
-        pubBtn.textContent = 'Опубликовать';
+        pubBtn.textContent = editingReviewId ? 'Сохранить изменения' : 'Опубликовать';
       }
     };
     document.getElementById('feed-search').oninput = document.getElementById('feed-sort').onchange = renderApp;
+
+    // Close emoji picker on outside click
+    document.addEventListener('click', e => {
+      if (openEmojiPickerId && !e.target.closest('[data-toggle-emoji-picker]') && !e.target.closest('.anim-popover')) {
+        openEmojiPickerId = null;
+        renderApp();
+      }
+    });
+
     document.getElementById('app-shell').onclick = async e => {
       const p = e.target.closest('[data-open-profile]');
-      if (p) { activeView = 'profile'; profileUserId = p.dataset.openProfile; renderApp(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+      if (p) { activeView = 'profile'; profileUserId = p.dataset.openProfile; openEmojiPickerId = null; renderApp(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+
+      const ep = e.target.closest('[data-toggle-emoji-picker]');
+      if (ep) {
+        e.stopPropagation();
+        const id = ep.dataset.toggleEmojiPicker;
+        openEmojiPickerId = openEmojiPickerId === id ? null : id;
+        renderApp();
+        return;
+      }
+
+      const rx = e.target.closest('[data-react-review]');
+      if (rx) {
+        e.stopPropagation();
+        const revId = rx.dataset.reactReview;
+        const emoji = rx.dataset.emoji;
+        openEmojiPickerId = null;
+        lastAnimatedReaction = `${revId}:${emoji}`;
+        const r = await fetch(`/api/reviews/${revId}/react`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ emoji })
+        });
+        if (r.ok) {
+          reviews = (await r.json()).reviews;
+          renderApp();
+        }
+        return;
+      }
+
       const v = e.target.closest('[data-vote]');
       if (v) {
         v.classList.add('anim-pop');
@@ -582,6 +802,22 @@
       }
       const tc = e.target.closest('[data-toggle-comments]');
       if (tc) { openComments[tc.dataset.toggleComments] = !openComments[tc.dataset.toggleComments]; renderApp(); return; }
+      const ed = e.target.closest('[data-edit-review]');
+      if (ed) {
+        const rev = reviews.find(x => x.id === ed.dataset.editReview);
+        if (!rev) return;
+        openEmojiPickerId = null;
+        editingReviewId = rev.id;
+        modalScores = { ...rev.scores };
+        document.getElementById('modal-title').textContent = 'Редактировать обзор';
+        document.getElementById('modal-subtitle').textContent = 'Измените текст рецензии, часы или оценки по критериям';
+        document.getElementById('btn-publish-review').textContent = 'Сохранить изменения';
+        document.getElementById('input-hours').value = rev.hoursPlayed !== null && rev.hoursPlayed !== undefined ? rev.hoursPlayed : '';
+        document.getElementById('input-review-text').value = rev.text || '';
+        document.getElementById('review-modal').classList.remove('hidden');
+        openRateStep({ appId: rev.appId, title: rev.gameTitle, img: rev.gameImg });
+        return;
+      }
       const del = e.target.closest('[data-del-review]');
       if (del) {
         const r = await fetch(`/api/reviews/${del.dataset.delReview}`, { method: 'DELETE' });
