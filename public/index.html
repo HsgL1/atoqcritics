@@ -304,19 +304,28 @@
           </div>
 
           <div id="custom-game-panel" class="hidden space-y-4">
+            <div id="existing-custom-games-wrap" class="hidden space-y-2">
+              <div class="text-xs font-semibold text-slate-300">Уже добавленные сторонние игры (нажмите, чтобы оценить):</div>
+              <div id="existing-custom-games-list" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-40 overflow-y-auto pr-1"></div>
+              <div class="border-t border-white/10 pt-2 text-[11px] text-slate-400">Или добавьте новую стороннюю игру:</div>
+            </div>
+
             <div class="space-y-1.5">
               <label for="custom-game-title" class="text-xs font-semibold text-slate-300">Название игры</label>
               <input id="custom-game-title" type="text" maxlength="120" placeholder="Например: Bloodborne, Minecraft, Escape from Tarkov..." class="w-full px-4 py-3 rounded-2xl bg-white/[0.07] border border-white/15 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#d9ff00] transition" />
             </div>
 
             <div class="space-y-2">
-              <label class="text-xs font-semibold text-slate-300">Обложка / логотип игры (файл или ссылка)</label>
-              <div class="flex flex-col sm:flex-row gap-2">
-                <label class="liquid-pill px-4 py-2.5 rounded-2xl text-xs font-semibold text-slate-200 cursor-pointer text-center shrink-0">
-                  📁 Загрузить картинку
+              <label class="text-xs font-semibold text-slate-300">Обложка / логотип (файл, ссылка или <span class="text-[#d9ff00]">Ctrl+V</span> из буфера)</label>
+              <div class="flex flex-wrap gap-2">
+                <label class="liquid-pill px-3.5 py-2.5 rounded-2xl text-xs font-semibold text-slate-200 cursor-pointer text-center shrink-0">
+                  📁 Файл
                   <input id="custom-game-file" type="file" accept="image/*" class="hidden" />
                 </label>
-                <input id="custom-game-url" type="url" placeholder="Или вставьте ссылку на картинку (https://...)" class="flex-1 px-4 py-2.5 rounded-2xl bg-white/[0.07] border border-white/15 text-xs sm:text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#66c0f4] transition" />
+                <button id="btn-paste-cover" type="button" class="liquid-pill px-3.5 py-2.5 rounded-2xl text-xs font-semibold text-[#d9ff00] hover:border-[#d9ff00]/50 cursor-pointer shrink-0">
+                  📋 Из буфера
+                </button>
+                <input id="custom-game-url" type="url" placeholder="Или ссылка на картинку (https://...)" class="flex-1 min-w-[180px] px-4 py-2.5 rounded-2xl bg-white/[0.07] border border-white/15 text-xs sm:text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#66c0f4] transition" />
               </div>
               <div id="custom-game-preview-wrap" class="hidden rounded-2xl overflow-hidden border border-white/15 bg-black/30 aspect-[460/215] max-w-xs">
                 <img id="custom-game-preview" alt="Предпросмотр обложки" class="w-full h-full object-cover" />
@@ -340,6 +349,17 @@
               </div>
             </div>
           </div>
+          <label class="flex items-center justify-between gap-3 rounded-2xl bg-white/[0.04] border border-white/10 px-4 py-3 cursor-pointer hover:border-white/20 transition">
+            <div>
+              <div class="text-sm font-semibold text-white">В игре нет нарратива</div>
+              <div class="text-[11px] text-slate-400">Итоговые 100 баллов посчитаются из 4 критериев по 25 баллов</div>
+            </div>
+            <div class="relative shrink-0">
+              <input id="toggle-no-narrative" type="checkbox" class="sr-only peer" />
+              <div class="w-11 h-6 rounded-full bg-white/15 border border-white/15 peer-checked:bg-[#d9ff00]/80 transition-colors"></div>
+              <div class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform peer-checked:translate-x-5 peer-checked:bg-[#090c12]"></div>
+            </div>
+          </label>
           <div id="criteria-sliders-container" class="space-y-3"></div>
           <input id="input-hours" type="number" step="0.1" min="0" placeholder="Часов в Steam (подтягивается из библиотеки)" class="w-full px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/15 text-sm text-white focus:outline-none focus:border-[#66c0f4] transition" />
           <textarea id="input-review-text" rows="4" required maxlength="2000" placeholder="Текст вашей рецензии..." class="w-full px-4 py-3 rounded-2xl bg-white/[0.06] border border-white/15 text-sm text-white focus:outline-none focus:border-[#d9ff00] transition"></textarea>
@@ -366,6 +386,7 @@
     let activeView = 'feed', profileUserId = null, searchTab = 'all', selectedGame = null, editingReviewId = null;
     let lastDisplayedGames = [];
     let modalScores = { gameplay: 16, visuals: 16, narrative: 16, audio: 16, emotions: 16 };
+    let modalNoNarrative = false;
     let openComments = {}, openEmojiPickerId = null, lastAnimatedReaction = null, searchTimer = null;
 
     const esc = s => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
@@ -377,11 +398,11 @@
           ? { l: 'Неплохо', c: '#fbbf24', bg: 'linear-gradient(135deg, #fde047 0%, #f59e0b 100%)', shadow: '0 8px 24px rgba(251,191,36,0.24)' }
           : { l: 'Слабо', c: '#fb7185', bg: 'linear-gradient(135deg, #fb7185 0%, #f43f5e 100%)', shadow: '0 8px 24px rgba(244,63,94,0.26)' };
 
-    function criterionFill(score) {
-      const s = Number(score) || 0;
-      if (s >= 17) return { bg: 'linear-gradient(90deg, rgba(163,230,53,0.34) 0%, rgba(132,204,22,0.48) 100%)', edge: 'rgba(217,255,0,0.75)' };
-      if (s >= 13) return { bg: 'linear-gradient(90deg, rgba(56,217,169,0.28) 0%, rgba(92,225,230,0.44) 100%)', edge: 'rgba(92,225,230,0.75)' };
-      if (s >= 9)  return { bg: 'linear-gradient(90deg, rgba(251,191,36,0.26) 0%, rgba(245,158,11,0.42) 100%)', edge: 'rgba(251,191,36,0.75)' };
+    function criterionFill(score, maxVal = 20) {
+      const pct = ((Number(score) || 0) / (maxVal || 20)) * 100;
+      if (pct >= 84) return { bg: 'linear-gradient(90deg, rgba(163,230,53,0.34) 0%, rgba(132,204,22,0.48) 100%)', edge: 'rgba(217,255,0,0.75)' };
+      if (pct >= 64) return { bg: 'linear-gradient(90deg, rgba(56,217,169,0.28) 0%, rgba(92,225,230,0.44) 100%)', edge: 'rgba(92,225,230,0.75)' };
+      if (pct >= 44) return { bg: 'linear-gradient(90deg, rgba(251,191,36,0.26) 0%, rgba(245,158,11,0.42) 100%)', edge: 'rgba(251,191,36,0.75)' };
       return { bg: 'linear-gradient(90deg, rgba(251,113,133,0.28) 0%, rgba(244,63,94,0.44) 100%)', edge: 'rgba(251,113,133,0.75)' };
     }
 
@@ -405,8 +426,8 @@
       img.src = makeFallbackCover(title);
     };
 
-    function sliderTrackBg(val, color) {
-      const pct = Math.min(100, Math.max(0, (Number(val) / 20) * 100));
+    function sliderTrackBg(val, color, maxVal = 20) {
+      const pct = Math.min(100, Math.max(0, (Number(val) / maxVal) * 100));
       return `linear-gradient(to right, ${color} 0%, ${color} ${pct}%, rgba(255,255,255,0.10) ${pct}%, rgba(255,255,255,0.10) 100%)`;
     }
 
@@ -589,6 +610,7 @@
           </div>
 
           <button type="button" data-toggle-comments="${rev.id}" class="liquid-pill px-3 py-1.5 rounded-full text-xs cursor-pointer ${cOpen ? 'text-[#66c0f4] border-[#66c0f4]/50' : ''}">💬 Комментарии (${rev.comments.length})</button>
+          <button type="button" data-rate-same-game="${esc(rev.id)}" title="Написать свой обзор на эту игру с этой же обложкой" class="liquid-pill px-3 py-1.5 rounded-full text-xs font-semibold text-[#d9ff00] hover:border-[#d9ff00]/60 hover:bg-[#d9ff00]/10 cursor-pointer">+ Оценить</button>
         </div>
         ${own ? `<div class="flex items-center gap-1.5"><button type="button" data-edit-review="${rev.id}" class="liquid-pill px-3 py-1.5 rounded-full text-xs text-slate-200 hover:text-white cursor-pointer">✏️ Изменить</button><button type="button" data-del-review="${rev.id}" class="liquid-pill px-3 py-1.5 rounded-full text-xs text-rose-300 hover:border-rose-400/50 cursor-pointer">Удалить</button></div>` : ''}
       `;
@@ -679,18 +701,19 @@
               </div>
             </div>
           </div>
-          <!-- Full-Pill Proportionally Filled Criteria Ovals (Unified Typography) -->
-          <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
-            ${CRITERIA.map(c => {
+          <!-- Full-Pill Proportionally Filled Criteria Ovals (5x20 or 4x25) -->
+          <div class="grid grid-cols-2 ${rev.noNarrative ? 'sm:grid-cols-4' : 'sm:grid-cols-5'} gap-2.5">
+            ${CRITERIA.filter(c => !(rev.noNarrative && c.key === 'narrative')).map(c => {
+              const maxVal = rev.noNarrative ? 25 : 20;
               const val = Number(rev.scores[c.key] || 0);
-              const pct = Math.min(100, Math.max(0, (val / 20) * 100));
-              const fill = criterionFill(val);
+              const pct = Math.min(100, Math.max(0, (val / maxVal) * 100));
+              const fill = criterionFill(val, maxVal);
               return `
                 <div class="relative overflow-hidden rounded-full bg-white/[0.05] border border-white/[0.12] px-3.5 py-2">
                   <div class="absolute inset-y-0 left-0 transition-all duration-500" style="width:${pct}%; background:${fill.bg}; ${pct > 0 && pct < 100 ? `border-right: 1.5px solid ${fill.edge};` : ''}"></div>
                   <div class="relative z-10 flex items-center justify-between gap-1 text-xs sm:text-[13px] font-semibold text-white tabular-nums">
                     <span class="truncate">${c.label}</span>
-                    <span class="shrink-0">${val}/20</span>
+                    <span class="shrink-0">${val}/${maxVal}</span>
                   </div>
                 </div>
               `;
@@ -849,34 +872,43 @@
         const owned = myLibrary.find(x => Number(x.appId) === Number(game.appId));
         document.getElementById('input-hours').value = owned ? owned.hoursPlayed : (game.hoursPlayed || '');
       }
-      document.getElementById('criteria-sliders-container').innerHTML = CRITERIA.map(c => {
-        const val = modalScores[c.key];
+      document.getElementById('toggle-no-narrative').checked = modalNoNarrative;
+      renderModalSliders();
+      updateScore();
+    }
+
+    function renderModalSliders() {
+      const maxVal = modalNoNarrative ? 25 : 20;
+      const activeCriteria = CRITERIA.filter(c => !(modalNoNarrative && c.key === 'narrative'));
+      document.getElementById('criteria-sliders-container').innerHTML = activeCriteria.map(c => {
+        const val = Math.min(maxVal, Math.max(0, Number(modalScores[c.key] || 0)));
         return `
           <div class="rounded-2xl bg-white/[0.04] border border-white/[0.08] px-4 py-3 space-y-2 transition hover:border-white/15">
-            <div class="flex justify-between text-sm">
+            <div class="flex justify-between text-sm tabular-nums">
               <span class="font-medium">${c.label}</span>
-              <b id="cv-${c.key}" style="color:${c.color}">${Math.round(val)} / 20</b>
+              <b id="cv-${c.key}" style="color:${c.color}">${Math.round(val)} / ${maxVal}</b>
             </div>
             <input
               type="range"
               min="0"
-              max="20"
+              max="${maxVal}"
               step="0.05"
               value="${val}"
               data-crit="${c.key}"
               data-color="${c.color}"
-              style="background:${sliderTrackBg(val, c.color)};"
+              data-max="${maxVal}"
+              style="background:${sliderTrackBg(val, c.color, maxVal)};"
               class="criteria-slider"
             />
           </div>
         `;
       }).join('');
-      updateScore();
     }
 
     function updateScore() {
-      const smoothTotal = CRITERIA.reduce((s, c) => s + Number(modalScores[c.key]), 0);
-      const displayTotal = CRITERIA.reduce((s, c) => s + Math.round(Number(modalScores[c.key])), 0);
+      const activeCriteria = CRITERIA.filter(c => !(modalNoNarrative && c.key === 'narrative'));
+      const smoothTotal = activeCriteria.reduce((s, c) => s + Number(modalScores[c.key] || 0), 0);
+      const displayTotal = activeCriteria.reduce((s, c) => s + Math.round(Number(modalScores[c.key] || 0)), 0);
       const m = scoreMeta(displayTotal);
       document.getElementById('live-score-number').textContent = displayTotal;
       document.getElementById('live-score-tier').textContent = m.l;
@@ -893,6 +925,7 @@
       openEmojiPickerId = null;
       editingReviewId = null;
       modalScores = { gameplay: 16, visuals: 16, narrative: 16, audio: 16, emotions: 16 };
+      modalNoNarrative = false;
       document.getElementById('modal-title').textContent = 'Новый обзор';
       document.getElementById('modal-subtitle').textContent = 'Поиск по всему каталогу Steam или вашей библиотеке';
       document.getElementById('btn-publish-review').textContent = 'Опубликовать';
@@ -916,23 +949,40 @@
     document.getElementById('review-modal').onclick = e => { if (e.target.id === 'review-modal') document.getElementById('review-modal').classList.add('hidden'); };
     let customCoverDataUrl = '';
 
-    function setSearchTab(tab) {
-      searchTab = tab;
-      document.getElementById('tab-all-steam').classList.toggle('liquid-pill-active', tab === 'all');
-      document.getElementById('tab-my-library').classList.toggle('liquid-pill-active', tab === 'library');
-      document.getElementById('tab-custom-game').classList.toggle('liquid-pill-active', tab === 'custom');
-      document.getElementById('steam-search-panel').classList.toggle('hidden', tab === 'custom');
-      document.getElementById('custom-game-panel').classList.toggle('hidden', tab !== 'custom');
-      if (tab !== 'custom') renderSearchResults(true);
+    let existingCustomGamesList = [];
+
+    function renderExistingCustomGames() {
+      const seen = new Map();
+      reviews.forEach(r => {
+        if (Number(r.appId) === 0 && r.gameTitle) {
+          const key = r.gameTitle.trim().toLowerCase();
+          if (!seen.has(key)) {
+            seen.set(key, { appId: 0, title: r.gameTitle, img: r.gameImg || makeFallbackCover(r.gameTitle) });
+          }
+        }
+      });
+      existingCustomGamesList = Array.from(seen.values());
+      const wrap = document.getElementById('existing-custom-games-wrap');
+      const box = document.getElementById('existing-custom-games-list');
+      if (!existingCustomGamesList.length) {
+        wrap.classList.add('hidden');
+        box.innerHTML = '';
+        return;
+      }
+      wrap.classList.remove('hidden');
+      box.innerHTML = existingCustomGamesList.map((g, idx) => `
+        <button type="button" data-pick-custom-idx="${idx}" class="liquid-pill rounded-2xl bg-white/[0.05] hover:bg-white/[0.11] p-2 flex items-center gap-2.5 text-left cursor-pointer group">
+          <img src="${esc(g.img)}" alt="${esc(g.title)}" class="w-16 h-9 rounded-lg object-cover shrink-0 bg-[#121a27]" />
+          <div class="min-w-0">
+            <div class="text-xs font-bold truncate group-hover:text-[#d9ff00] transition">${esc(g.title)}</div>
+            <div class="text-[10px] text-slate-400">Своя игра</div>
+          </div>
+        </button>
+      `).join('');
     }
 
-    document.getElementById('tab-all-steam').onclick = () => setSearchTab('all');
-    document.getElementById('tab-my-library').onclick = () => setSearchTab('library');
-    document.getElementById('tab-custom-game').onclick = () => setSearchTab('custom');
-
-    document.getElementById('custom-game-file').onchange = e => {
-      const file = e.target.files && e.target.files[0];
-      if (!file) return;
+    function processCoverBlob(blob, toastText = '') {
+      if (!blob) return;
       const reader = new FileReader();
       reader.onload = () => {
         const img = new Image();
@@ -948,11 +998,76 @@
           document.getElementById('custom-game-url').value = '';
           document.getElementById('custom-game-preview').src = customCoverDataUrl;
           document.getElementById('custom-game-preview-wrap').classList.remove('hidden');
+          if (toastText) showToast(toastText);
         };
         img.src = reader.result;
       };
-      reader.readAsDataURL(file);
+      reader.readAsDataURL(blob);
+    }
+
+    function setSearchTab(tab) {
+      searchTab = tab;
+      document.getElementById('tab-all-steam').classList.toggle('liquid-pill-active', tab === 'all');
+      document.getElementById('tab-my-library').classList.toggle('liquid-pill-active', tab === 'library');
+      document.getElementById('tab-custom-game').classList.toggle('liquid-pill-active', tab === 'custom');
+      document.getElementById('steam-search-panel').classList.toggle('hidden', tab === 'custom');
+      document.getElementById('custom-game-panel').classList.toggle('hidden', tab !== 'custom');
+      if (tab === 'custom') renderExistingCustomGames();
+      else renderSearchResults(true);
+    }
+
+    document.getElementById('tab-all-steam').onclick = () => setSearchTab('all');
+    document.getElementById('tab-my-library').onclick = () => setSearchTab('library');
+    document.getElementById('tab-custom-game').onclick = () => setSearchTab('custom');
+
+    document.getElementById('existing-custom-games-list').onclick = e => {
+      const b = e.target.closest('[data-pick-custom-idx]');
+      if (!b) return;
+      const g = existingCustomGamesList[Number(b.dataset.pickCustomIdx)];
+      if (g) openRateStep(g);
     };
+
+    document.getElementById('custom-game-file').onchange = e => {
+      const file = e.target.files && e.target.files[0];
+      if (file) processCoverBlob(file);
+    };
+
+    document.getElementById('btn-paste-cover').onclick = async () => {
+      if (navigator.clipboard && typeof navigator.clipboard.read === 'function') {
+        try {
+          const items = await navigator.clipboard.read();
+          for (const item of items) {
+            const imgType = item.types.find(t => t.startsWith('image/'));
+            if (imgType) {
+              const blob = await item.getType(imgType);
+              processCoverBlob(blob, 'Обложка вставлена из буфера!');
+              return;
+            }
+          }
+          showToast('В буфере нет картинки — скопируйте изображение и нажмите Ctrl+V');
+        } catch {
+          showToast('Нажмите Ctrl+V прямо на этой странице, чтобы вставить картинку');
+        }
+      } else {
+        showToast('Нажмите Ctrl+V прямо на этой странице, чтобы вставить картинку');
+      }
+    };
+
+    document.addEventListener('paste', e => {
+      const modalOpen = !document.getElementById('review-modal').classList.contains('hidden');
+      const customOpen = !document.getElementById('custom-game-panel').classList.contains('hidden');
+      if (!modalOpen || !customOpen) return;
+      const items = e.clipboardData && e.clipboardData.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type && item.type.startsWith('image/')) {
+          e.preventDefault();
+          const blob = item.getAsFile();
+          if (blob) processCoverBlob(blob, 'Обложка вставлена из буфера!');
+          return;
+        }
+      }
+    });
 
     document.getElementById('custom-game-url').oninput = e => {
       const url = e.target.value.trim();
@@ -982,13 +1097,30 @@
       const g = lastDisplayedGames[Number(b.dataset.pickIdx)];
       if (g) openRateStep(g);
     };
+    document.getElementById('toggle-no-narrative').onchange = e => {
+      const next = e.target.checked;
+      if (next === modalNoNarrative) return;
+      const oldMax = modalNoNarrative ? 25 : 20;
+      const newMax = next ? 25 : 20;
+      modalNoNarrative = next;
+      ['gameplay', 'visuals', 'audio', 'emotions'].forEach(k => {
+        modalScores[k] = Math.min(newMax, Math.max(0, Math.round((Number(modalScores[k] || 0) / oldMax) * newMax)));
+      });
+      if (!modalNoNarrative && (!modalScores.narrative || modalScores.narrative <= 0)) {
+        modalScores.narrative = 16;
+      }
+      renderModalSliders();
+      updateScore();
+    };
+
     document.getElementById('criteria-sliders-container').oninput = e => {
       const key = e.target.dataset.crit;
       if (!key) return;
+      const maxVal = Number(e.target.dataset.max || (modalNoNarrative ? 25 : 20));
       const rawVal = Number(e.target.value);
       modalScores[key] = rawVal;
-      e.target.style.background = sliderTrackBg(rawVal, e.target.dataset.color || '#d9ff00');
-      document.getElementById('cv-' + key).textContent = `${Math.round(rawVal)} / 20`;
+      e.target.style.background = sliderTrackBg(rawVal, e.target.dataset.color || '#d9ff00', maxVal);
+      document.getElementById('cv-' + key).textContent = `${Math.round(rawVal)} / ${maxVal}`;
       updateScore();
     };
     document.getElementById('review-form').onsubmit = async e => {
@@ -1005,6 +1137,7 @@
         const payload = isEdit
           ? {
               scores: roundedScores,
+              noNarrative: modalNoNarrative,
               hoursPlayed: document.getElementById('input-hours').value,
               text: document.getElementById('input-review-text').value
             }
@@ -1013,6 +1146,7 @@
               gameTitle: selectedGame.title,
               gameImg: selectedGame.img,
               scores: roundedScores,
+              noNarrative: modalNoNarrative,
               hoursPlayed: document.getElementById('input-hours').value,
               text: document.getElementById('input-review-text').value
             };
@@ -1203,6 +1337,27 @@
         updateCardComments(revId);
         return;
       }
+      const rsg = e.target.closest('[data-rate-same-game]');
+      if (rsg) {
+        const rev = reviews.find(x => x.id === rsg.dataset.rateSameGame);
+        if (!rev) return;
+        openEmojiPickerId = null;
+        editingReviewId = null;
+        modalScores = { gameplay: 16, visuals: 16, narrative: 16, audio: 16, emotions: 16 };
+        modalNoNarrative = Boolean(rev.noNarrative);
+        if (modalNoNarrative) {
+          modalScores = { gameplay: 20, visuals: 20, narrative: 0, audio: 20, emotions: 20 };
+        }
+        document.getElementById('modal-title').textContent = 'Новый обзор';
+        document.getElementById('modal-subtitle').textContent = `Оценка игры ${rev.gameTitle}`;
+        document.getElementById('btn-publish-review').textContent = 'Опубликовать';
+        document.getElementById('input-review-text').value = '';
+        document.getElementById('input-hours').value = '';
+        document.getElementById('review-modal').classList.remove('hidden');
+        openRateStep({ appId: rev.appId, title: rev.gameTitle, img: rev.gameImg });
+        return;
+      }
+
       const ed = e.target.closest('[data-edit-review]');
       if (ed) {
         const rev = reviews.find(x => x.id === ed.dataset.editReview);
@@ -1210,6 +1365,7 @@
         openEmojiPickerId = null;
         editingReviewId = rev.id;
         modalScores = { ...rev.scores };
+        modalNoNarrative = Boolean(rev.noNarrative);
         document.getElementById('modal-title').textContent = 'Редактировать обзор';
         document.getElementById('modal-subtitle').textContent = 'Измените текст рецензии, часы или оценки по критериям';
         document.getElementById('btn-publish-review').textContent = 'Сохранить изменения';
