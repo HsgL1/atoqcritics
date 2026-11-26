@@ -245,7 +245,7 @@ async function backfillAchievements() {
 // ==================== EXPRESS APP ====================
 const app = express();
 app.set('trust proxy', 1);
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: '5mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use(async (req, res, next) => {
@@ -442,6 +442,33 @@ app.get('/api/steam/library', requireAuth, async (req, res) => {
   }
 });
 
+const coverUrlCache = new Map();
+
+app.get('/api/steam/cover/:appId', async (req, res) => {
+  const appId = Number(req.params.appId);
+  if (!appId || appId <= 0) return res.status(404).end();
+  if (coverUrlCache.has(appId)) {
+    const cached = coverUrlCache.get(appId);
+    return cached ? res.redirect(302, cached) : res.status(404).end();
+  }
+  try {
+    const r = await fetchWithRetry(`https://store.steampowered.com/api/appdetails?appids=${appId}&filters=basic`, 2);
+    if (r.ok) {
+      const data = await r.response.json();
+      const entry = data && data[String(appId)];
+      const headerImg = entry && entry.success && entry.data && (entry.data.header_image || entry.data.capsule_image);
+      if (headerImg) {
+        coverUrlCache.set(appId, headerImg);
+        // Also heal saved reviews in DB so future loads are instant
+        pool.query('UPDATE reviews SET game_img = $1 WHERE app_id = $2', [headerImg, appId]).catch(() => {});
+        return res.redirect(302, headerImg);
+      }
+    }
+  } catch {}
+  coverUrlCache.set(appId, null);
+  return res.status(404).end();
+});
+
 app.get('/api/steam/search', requireAuth, async (req, res) => {
   const term = String(req.query.q || '').trim();
   if (term.length < 2) return res.json({ games: [] });
@@ -545,7 +572,7 @@ app.get('/api/reviews', requireAuth, async (req, res) => {
 app.post('/api/reviews', requireAuth, async (req, res) => {
   try {
     const { appId, gameTitle, gameImg, scores, hoursPlayed, text } = req.body || {};
-    if (!appId || !gameTitle || !text || !scores) {
+    if ((appId === undefined || appId === null || appId === '') || !gameTitle || !text || !scores) {
       return res.status(400).json({ error: 'Заполните все обязательные поля обзора' });
     }
     const clamp = v => Math.min(20, Math.max(0, Math.round(Number(v) || 0)));
@@ -557,7 +584,8 @@ app.post('/api/reviews', requireAuth, async (req, res) => {
     const total = g + v + n + a + e;
     const id = 'rev_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
 
-    const ach = await fetchSteamAchievements(req.user.steam_id, Number(appId));
+    const numAppId = Number(appId) || 0;
+    const ach = numAppId > 0 ? await fetchSteamAchievements(req.user.steam_id, numAppId) : null;
 
     await pool.query(`
       INSERT INTO reviews (id, user_steam_id, app_id, game_title, game_img, gameplay, visuals, narrative, audio, emotions, total, hours_played, ach_unlocked, ach_total, text, created_at)
@@ -567,7 +595,7 @@ app.post('/api/reviews', requireAuth, async (req, res) => {
       req.user.steam_id,
       Number(appId),
       String(gameTitle).slice(0, 150),
-      gameImg || `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${Number(appId)}/header.jpg`,
+      gameImg || (numAppId > 0 ? `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${numAppId}/header.jpg` : ''),
       g, v, n, a, e, total,
       hoursPlayed !== null && hoursPlayed !== '' && !Number.isNaN(Number(hoursPlayed)) ? Number(hoursPlayed) : null,
       ach ? ach.unlocked : null,
@@ -648,7 +676,7 @@ app.post('/api/reviews/:id/vote', requireAuth, async (req, res) => {
   }
 });
 
-const ALLOWED_EMOJIS = ['🔥', '❤️', '😂', '🤯', '💯', '👑', '💀', '🤡', '😢', '⚡', '🎯', '🫡'];
+const ALLOWED_EMOJIS = ['🔥', '❤️', '😂', '🤯', '💯', '👑', '🐐', '💀', '🤡', '🤮', '😢', '⚡', '🎯', '🫡'];
 
 app.post('/api/reviews/:id/react', requireAuth, async (req, res) => {
   try {
@@ -689,6 +717,18 @@ app.post('/api/reviews/:id/comments', requireAuth, async (req, res) => {
     res.status(201).json({ reviews: await hydrateReviews() });
   } catch (err) {
     res.status(500).json({ error: 'Ошибка добавления комментария' });
+  }
+});
+
+app.delete('/api/comments/:id', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT user_steam_id FROM comments WHERE id = $1', [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Комментарий не найден' });
+    if (rows[0].user_steam_id !== req.user.steam_id) return res.status(403).json({ error: 'Нет прав на удаление' });
+    await pool.query('DELETE FROM comments WHERE id = $1', [req.params.id]);
+    res.json({ ok: true, reviews: await hydrateReviews() });
+  } catch (err) {
+    res.status(500).json({ error: 'Ошибка удаления комментария' });
   }
 });
 
