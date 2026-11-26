@@ -1,8 +1,7 @@
 require('dotenv').config();
 const path = require('path');
+const crypto = require('crypto');
 const express = require('express');
-const session = require('express-session');
-const pgSession = require('connect-pg-simple')(session);
 const { Pool } = require('pg');
 
 const PORT = process.env.PORT || 3000;
@@ -23,8 +22,59 @@ function getBaseUrl(req) {
   return `${proto}://${host}`;
 }
 
-if (!DATABASE_URL) {
-  console.warn('ВНИМАНИЕ: DATABASE_URL не задан! Укажите строку подключения PostgreSQL (Supabase/Neon).');
+// ==================== SIGNED COOKIE AUTH (ZERO SESSION-STORE BUGS) ====================
+const COOKIE_NAME = 'atoq_steam_sid';
+
+function signSteamId(steamId) {
+  const sig = crypto.createHmac('sha256', SESSION_SECRET).update(String(steamId)).digest('hex');
+  return `${steamId}.${sig}`;
+}
+
+function verifyCookieValue(val) {
+  if (!val || typeof val !== 'string' || !val.includes('.')) return null;
+  const idx = val.lastIndexOf('.');
+  const steamId = val.slice(0, idx);
+  const sig = val.slice(idx + 1);
+  const expected = crypto.createHmac('sha256', SESSION_SECRET).update(steamId).digest('hex');
+  try {
+    const a = Buffer.from(sig, 'hex');
+    const b = Buffer.from(expected, 'hex');
+    if (a.length !== b.length) return null;
+    return crypto.timingSafeEqual(a, b) ? steamId : null;
+  } catch {
+    return null;
+  }
+}
+
+function parseCookies(req) {
+  const header = req.headers.cookie || '';
+  const out = {};
+  header.split(';').forEach(part => {
+    const eq = part.indexOf('=');
+    if (eq > 0) {
+      const k = part.slice(0, eq).trim();
+      const v = part.slice(eq + 1).trim();
+      try { out[k] = decodeURIComponent(v); } catch { out[k] = v; }
+    }
+  });
+  return out;
+}
+
+function setAuthCookie(req, res, steamId) {
+  const isHttps = req.secure || (req.headers['x-forwarded-proto'] || '').includes('https') || Boolean(process.env.RENDER);
+  const parts = [
+    `${COOKIE_NAME}=${encodeURIComponent(signSteamId(steamId))}`,
+    'Path=/',
+    'HttpOnly',
+    'SameSite=Lax',
+    'Max-Age=2592000'
+  ];
+  if (isHttps) parts.push('Secure');
+  res.setHeader('Set-Cookie', parts.join('; '));
+}
+
+function clearAuthCookie(res) {
+  res.setHeader('Set-Cookie', `${COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
 }
 
 // ==================== CLOUD POSTGRESQL (Supabase / Neon) ====================
@@ -34,6 +84,10 @@ const pool = new Pool({
 });
 
 async function initDb() {
+  if (!DATABASE_URL) {
+    console.warn('ВНИМАНИЕ: DATABASE_URL не задан!');
+    return;
+  }
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
       steam_id TEXT PRIMARY KEY,
@@ -82,36 +136,18 @@ async function initDb() {
 const app = express();
 app.set('trust proxy', 1);
 app.use(express.json({ limit: '1mb' }));
-
-const isProdHttps = (process.env.BASE_URL || '').includes('https://') || Boolean(process.env.RENDER);
-const sessionConfig = {
-  secret: SESSION_SECRET,
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    maxAge: 30 * 24 * 60 * 60 * 1000,
-    sameSite: 'lax',
-    secure: isProdHttps
-  }
-};
-
-if (DATABASE_URL) {
-  sessionConfig.store = new pgSession({
-    pool,
-    createTableIfMissing: true
-  });
-}
-
-app.use(session(sessionConfig));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Attach current user from session
+// Attach current user from signed cookie
 app.use(async (req, res, next) => {
-  if (req.session && req.session.steamId) {
+  const cookies = parseCookies(req);
+  const steamId = verifyCookieValue(cookies[COOKIE_NAME]);
+  if (steamId) {
     try {
-      const { rows } = await pool.query('SELECT * FROM users WHERE steam_id = $1', [req.session.steamId]);
+      const { rows } = await pool.query('SELECT * FROM users WHERE steam_id = $1', [steamId]);
       req.user = rows[0] || null;
     } catch (err) {
+      console.error('DB user lookup error:', err.message);
       req.user = null;
     }
   }
@@ -125,10 +161,10 @@ function requireAuth(req, res, next) {
   next();
 }
 
-// ==================== DIRECT STEAM OPENID 2.0 (NO LEGACY PASSPORT BUGS) ====================
+// ==================== DIRECT STEAM OPENID 2.0 ====================
 app.get('/auth/steam', (req, res) => {
   if (!STEAM_API_KEY) {
-    return res.status(500).send('Ошибка настройки: укажите STEAM_API_KEY в Environment на Render.');
+    return res.redirect('/?auth_err=' + encodeURIComponent('На сервере не указан STEAM_API_KEY'));
   }
   const baseUrl = getBaseUrl(req);
   const params = new URLSearchParams({
@@ -139,7 +175,7 @@ app.get('/auth/steam', (req, res) => {
     'openid.identity': 'http://specs.openid.net/auth/2.0/identifier_select',
     'openid.claimed_id': 'http://specs.openid.net/auth/2.0/identifier_select'
   });
-  console.log('Redirecting to Steam OpenID with return_to:', `${baseUrl}/auth/steam/return`);
+  console.log('Steam OpenID redirect -> return_to:', `${baseUrl}/auth/steam/return`);
   res.redirect(`https://steamcommunity.com/openid/login?${params.toString()}`);
 });
 
@@ -147,10 +183,9 @@ app.get('/auth/steam/return', async (req, res) => {
   try {
     const query = req.query || {};
     if (query['openid.mode'] !== 'id_res') {
-      return res.redirect('/?auth=cancelled');
+      return res.redirect('/?auth_err=' + encodeURIComponent('Вход через Steam был отменён'));
     }
 
-    // Verify assertion directly with Steam
     const verifyParams = new URLSearchParams();
     for (const [k, v] of Object.entries(query)) {
       verifyParams.append(k, String(v));
@@ -166,17 +201,16 @@ app.get('/auth/steam/return', async (req, res) => {
 
     if (!verifyText.includes('is_valid:true')) {
       console.error('Steam OpenID verification failed:', verifyText);
-      return res.redirect('/?auth=invalid');
+      return res.redirect('/?auth_err=' + encodeURIComponent('Steam не подтвердил авторизацию. Попробуйте ещё раз.'));
     }
 
     const claimedId = String(query['openid.claimed_id'] || '');
     const match = claimedId.match(/\/openid\/id\/(\d+)$/);
     if (!match) {
-      return res.redirect('/?auth=noid');
+      return res.redirect('/?auth_err=' + encodeURIComponent('Не удалось получить SteamID из ответа Steam'));
     }
     const steamId = match[1];
 
-    // Fetch real Steam profile info (nickname & avatar)
     let name = `Steam_${steamId.slice(-6)}`;
     let avatar = '';
     let profileUrl = `https://steamcommunity.com/profiles/${steamId}`;
@@ -203,20 +237,17 @@ app.get('/auth/steam/return', async (req, res) => {
         profile_url = EXCLUDED.profile_url
     `, [steamId, name, avatar, profileUrl, Date.now()]);
 
-    req.session.steamId = steamId;
-    req.session.save(() => {
-      res.redirect('/');
-    });
+    setAuthCookie(req, res, steamId);
+    res.redirect('/');
   } catch (err) {
     console.error('Steam auth return error:', err);
-    res.redirect('/?auth=error');
+    res.redirect('/?auth_err=' + encodeURIComponent('Ошибка сервера при входе: ' + (err.message || 'DB error')));
   }
 });
 
 app.post('/api/logout', (req, res) => {
-  req.session.destroy(() => {
-    res.json({ ok: true });
-  });
+  clearAuthCookie(res);
+  res.json({ ok: true });
 });
 
 app.get('/api/me', (req, res) => {
