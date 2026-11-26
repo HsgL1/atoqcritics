@@ -225,6 +225,7 @@ async function initDb() {
   await pool.query(`
     ALTER TABLE reviews ADD COLUMN IF NOT EXISTS ach_unlocked INTEGER;
     ALTER TABLE reviews ADD COLUMN IF NOT EXISTS ach_total INTEGER;
+    ALTER TABLE reviews ADD COLUMN IF NOT EXISTS no_narrative BOOLEAN DEFAULT FALSE;
   `);
   console.log('Облачная база PostgreSQL подключена и таблицы готовы.');
   // Backfill achievements for existing reviews in background
@@ -549,6 +550,7 @@ async function hydrateReviews() {
       emotions: r.emotions
     },
     total: r.total,
+    noNarrative: Boolean(r.no_narrative),
     hoursPlayed: r.hours_played,
     achUnlocked: r.ach_unlocked !== null && r.ach_unlocked !== undefined ? Number(r.ach_unlocked) : null,
     achTotal: r.ach_total !== null && r.ach_total !== undefined ? Number(r.ach_total) : null,
@@ -571,14 +573,16 @@ app.get('/api/reviews', requireAuth, async (req, res) => {
 
 app.post('/api/reviews', requireAuth, async (req, res) => {
   try {
-    const { appId, gameTitle, gameImg, scores, hoursPlayed, text } = req.body || {};
+    const { appId, gameTitle, gameImg, scores, noNarrative, hoursPlayed, text } = req.body || {};
     if ((appId === undefined || appId === null || appId === '') || !gameTitle || !text || !scores) {
       return res.status(400).json({ error: 'Заполните все обязательные поля обзора' });
     }
-    const clamp = v => Math.min(20, Math.max(0, Math.round(Number(v) || 0)));
+    const skipNar = Boolean(noNarrative);
+    const maxScore = skipNar ? 25 : 20;
+    const clamp = v => Math.min(maxScore, Math.max(0, Math.round(Number(v) || 0)));
     const g = clamp(scores.gameplay);
     const v = clamp(scores.visuals);
-    const n = clamp(scores.narrative);
+    const n = skipNar ? 0 : clamp(scores.narrative);
     const a = clamp(scores.audio);
     const e = clamp(scores.emotions);
     const total = g + v + n + a + e;
@@ -588,15 +592,16 @@ app.post('/api/reviews', requireAuth, async (req, res) => {
     const ach = numAppId > 0 ? await fetchSteamAchievements(req.user.steam_id, numAppId) : null;
 
     await pool.query(`
-      INSERT INTO reviews (id, user_steam_id, app_id, game_title, game_img, gameplay, visuals, narrative, audio, emotions, total, hours_played, ach_unlocked, ach_total, text, created_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+      INSERT INTO reviews (id, user_steam_id, app_id, game_title, game_img, gameplay, visuals, narrative, audio, emotions, total, no_narrative, hours_played, ach_unlocked, ach_total, text, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
     `, [
       id,
       req.user.steam_id,
-      Number(appId),
+      numAppId,
       String(gameTitle).slice(0, 150),
       gameImg || (numAppId > 0 ? `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${numAppId}/header.jpg` : ''),
       g, v, n, a, e, total,
+      skipNar,
       hoursPlayed !== null && hoursPlayed !== '' && !Number.isNaN(Number(hoursPlayed)) ? Number(hoursPlayed) : null,
       ach ? ach.unlocked : null,
       ach ? ach.total : null,
@@ -616,27 +621,29 @@ app.put('/api/reviews/:id', requireAuth, async (req, res) => {
     if (!rows[0]) return res.status(404).json({ error: 'Обзор не найден' });
     if (rows[0].user_steam_id !== req.user.steam_id) return res.status(403).json({ error: 'Нет прав' });
 
-    const { scores, hoursPlayed, text } = req.body || {};
+    const { scores, noNarrative, hoursPlayed, text } = req.body || {};
     if (!text || !scores) {
       return res.status(400).json({ error: 'Заполните текст и оценки' });
     }
-    const clamp = v => Math.min(20, Math.max(0, Math.round(Number(v) || 0)));
+    const skipNar = Boolean(noNarrative);
+    const maxScore = skipNar ? 25 : 20;
+    const clamp = v => Math.min(maxScore, Math.max(0, Math.round(Number(v) || 0)));
     const g = clamp(scores.gameplay);
     const v = clamp(scores.visuals);
-    const n = clamp(scores.narrative);
+    const n = skipNar ? 0 : clamp(scores.narrative);
     const a = clamp(scores.audio);
     const e = clamp(scores.emotions);
     const total = g + v + n + a + e;
     const hrs = hoursPlayed !== null && hoursPlayed !== '' && !Number.isNaN(Number(hoursPlayed)) ? Number(hoursPlayed) : null;
 
-    const ach = await fetchSteamAchievements(req.user.steam_id, rows[0].app_id);
+    const ach = rows[0].app_id > 0 ? await fetchSteamAchievements(req.user.steam_id, rows[0].app_id) : null;
 
     await pool.query(`
       UPDATE reviews
-      SET gameplay = $1, visuals = $2, narrative = $3, audio = $4, emotions = $5, total = $6, hours_played = $7, text = $8,
-          ach_unlocked = COALESCE($9, ach_unlocked), ach_total = COALESCE($10, ach_total)
-      WHERE id = $11
-    `, [g, v, n, a, e, total, hrs, String(text).trim().slice(0, 2000), ach ? ach.unlocked : null, ach ? ach.total : null, req.params.id]);
+      SET gameplay = $1, visuals = $2, narrative = $3, audio = $4, emotions = $5, total = $6, no_narrative = $7, hours_played = $8, text = $9,
+          ach_unlocked = COALESCE($10, ach_unlocked), ach_total = COALESCE($11, ach_total)
+      WHERE id = $12
+    `, [g, v, n, a, e, total, skipNar, hrs, String(text).trim().slice(0, 2000), ach ? ach.unlocked : null, ach ? ach.total : null, req.params.id]);
 
     res.json({ ok: true, reviews: await hydrateReviews() });
   } catch (err) {
