@@ -190,7 +190,7 @@
 </head>
 <body>
   <div class="ambient-bg" aria-hidden="true"></div>
-  <div id="toast-container" class="fixed bottom-20 sm:bottom-5 left-3 right-3 sm:left-auto sm:right-5 z-50 flex flex-col items-center sm:items-end gap-2 pointer-events-none"></div>
+  <div id="toast-container" class="fixed bottom-5 left-3 right-3 sm:left-auto sm:right-5 z-50 flex flex-col items-center sm:items-end gap-2 pointer-events-none"></div>
 
   <!-- INITIAL SPLASH LOADER -->
   <div id="boot-loader" class="relative z-30 min-h-screen flex flex-col items-center justify-center gap-4 p-4">
@@ -223,8 +223,8 @@
   </section>
 
   <!-- MAIN APP -->
-  <div id="app-shell" class="hidden relative z-10 min-h-screen flex flex-col anim-view">
-    <header class="sticky top-0 z-30 px-3 sm:px-6 pt-2.5 sm:pt-3 pb-2">
+  <div id="app-shell" class="hidden relative z-10 min-h-screen flex flex-col">
+    <header class="sticky top-0 z-30 px-3 sm:px-6 pt-2.5 sm:pt-3 pb-2 space-y-2">
       <div class="max-w-6xl mx-auto liquid-glass rounded-full px-3 sm:px-4 py-2 flex items-center justify-between gap-2">
         <button id="nav-brand" type="button" class="flex items-center gap-2 sm:gap-2.5 cursor-pointer group shrink-0">
           <img src="/logo.jpg" alt="AToQ" class="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover border border-white/25 group-hover:scale-105 transition" />
@@ -240,9 +240,25 @@
           <button id="btn-logout" type="button" title="Выйти" class="liquid-pill p-2 rounded-full text-slate-300 hover:text-white cursor-pointer"><i data-lucide="log-out" class="w-4 h-4"></i></button>
         </div>
       </div>
+
+      <!-- Mobile Sticky Top Tabs -->
+      <nav class="sm:hidden max-w-6xl mx-auto liquid-glass rounded-full p-1 grid grid-cols-3 gap-1" aria-label="Мобильная навигация">
+        <button id="mnav-home" type="button" class="liquid-pill py-2 px-2 rounded-full text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer">
+          <i data-lucide="bar-chart-3" class="w-3.5 h-3.5"></i>
+          <span>Главная</span>
+        </button>
+        <button id="mnav-feed" type="button" class="liquid-pill py-2 px-2 rounded-full text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer">
+          <i data-lucide="flame" class="w-3.5 h-3.5"></i>
+          <span>Лента</span>
+        </button>
+        <button id="mnav-profile" type="button" class="liquid-pill py-2 px-2 rounded-full text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer">
+          <i data-lucide="user" class="w-3.5 h-3.5"></i>
+          <span>Профиль</span>
+        </button>
+      </nav>
     </header>
 
-    <main class="flex-1 w-full max-w-6xl mx-auto px-3 sm:px-6 pt-3 sm:pt-4 pb-24 sm:pb-16">
+    <main class="flex-1 w-full max-w-6xl mx-auto px-3 sm:px-6 pt-2 sm:pt-4 pb-12 sm:pb-16">
       <section id="view-home" class="space-y-5 anim-view">
         <!-- Hero KPI Summary Row -->
         <div id="home-kpi-row" class="grid grid-cols-2 lg:grid-cols-4 gap-3.5"></div>
@@ -357,23 +373,7 @@
       </section>
     </main>
 
-    <!-- MOBILE FLOATING LIQUID-GLASS BOTTOM TAB BAR -->
-    <nav class="sm:hidden fixed bottom-3 left-3 right-3 z-30 pb-[env(safe-area-inset-bottom)]" aria-label="Мобильная навигация">
-      <div class="liquid-glass-strong rounded-full p-1.5 grid grid-cols-3 gap-1 shadow-2xl">
-        <button id="mnav-home" type="button" class="liquid-pill py-2.5 px-2 rounded-full text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer">
-          <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
-          <span>Главная</span>
-        </button>
-        <button id="mnav-feed" type="button" class="liquid-pill py-2.5 px-2 rounded-full text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer">
-          <i data-lucide="flame" class="w-4 h-4"></i>
-          <span>Лента</span>
-        </button>
-        <button id="mnav-profile" type="button" class="liquid-pill py-2.5 px-2 rounded-full text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer">
-          <i data-lucide="user" class="w-4 h-4"></i>
-          <span>Профиль</span>
-        </button>
-      </div>
-    </nav>
+
   </div>
 
   <!-- MODAL: NEW REVIEW -->
