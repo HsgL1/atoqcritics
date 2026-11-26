@@ -413,16 +413,15 @@
       if (!rev.achTotal || rev.achTotal <= 0 || rev.achUnlocked === null || rev.achUnlocked === undefined) return '';
       const isPerfect = rev.achUnlocked >= rev.achTotal;
       if (isPerfect) {
-        // Unique Steam-inspired Perfect Game Ribbon recolored in AToQcritics Acid-Lime & Cyan
         return `
           <span
             title="Выбиты все достижения в Steam (100%)"
-            class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-gradient-to-r from-[#d9ff00]/22 via-[#5ce1e6]/16 to-[#d9ff00]/22 border border-[#d9ff00]/65 text-[#eaff66] shadow-[0_0_16px_rgba(217,255,0,0.22)]"
+            class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-sm font-extrabold bg-gradient-to-r from-[#d9ff00]/22 via-[#5ce1e6]/16 to-[#d9ff00]/22 border border-[#d9ff00]/70 text-[#eaff66] shadow-[0_0_20px_rgba(217,255,0,0.25)]"
           >
-            <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path d="M8.5 14.5L7 22l5-2.6L17 22l-1.5-7.5" stroke="#5ce1e6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              <circle cx="12" cy="9.5" r="6.5" fill="rgba(217,255,0,0.22)" stroke="#d9ff00" stroke-width="2"/>
-              <path d="M9.4 9.6l1.8 1.8 3.5-3.6" stroke="#d9ff00" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="12" cy="9.5" r="6.5" fill="rgba(217,255,0,0.24)" stroke="#d9ff00" stroke-width="2"/>
+              <path d="M9.4 9.6l1.8 1.8 3.5-3.6" stroke="#d9ff00" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
             <span>100% • ${rev.achUnlocked}/${rev.achTotal}</span>
           </span>
@@ -432,9 +431,9 @@
       return `
         <span
           title="Достижения в Steam: ${rev.achUnlocked} из ${rev.achTotal} (${pct}%)"
-          class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-[#66c0f4]/12 border border-[#66c0f4]/35 text-[#9bd6f9]"
+          class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-sm font-bold bg-[#66c0f4]/14 border border-[#66c0f4]/40 text-[#9bd6f9]"
         >
-          <svg class="w-3.5 h-3.5 shrink-0 text-[#66c0f4]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <svg class="w-5 h-5 shrink-0 text-[#66c0f4]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>
           </svg>
           <span>${rev.achUnlocked}/${rev.achTotal}</span>
@@ -442,14 +441,12 @@
       `;
     }
 
-    function renderCard(rev, idx = 0, animate = false) {
-      const m = scoreMeta(rev.total);
+    function renderCardActionsInner(rev) {
       const liked = rev.likes.includes(currentUser.steam_id);
       const disliked = rev.dislikes.includes(currentUser.steam_id);
       const own = rev.userId === currentUser.steam_id;
       const cOpen = Boolean(openComments[rev.id]);
       const pickerOpen = openEmojiPickerId === rev.id;
-      const delay = Math.min(idx * 40, 240);
       const reactions = rev.reactions || {};
       const activeReactionPills = Object.entries(reactions)
         .filter(([, list]) => Array.isArray(list) && list.length > 0)
@@ -468,6 +465,79 @@
             </button>
           `;
         }).join('');
+
+      return `
+        <div class="flex flex-wrap items-center gap-2 relative">
+          <button type="button" data-vote="${rev.id}" data-val="1" class="liquid-pill px-3.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 cursor-pointer ${liked ? 'text-[#d9ff00] border-[#d9ff00]/60 bg-[#d9ff00]/10' : 'text-slate-200'}"><span class="text-lg leading-none">👍</span><span>${rev.likes.length}</span></button>
+          <button type="button" data-vote="${rev.id}" data-val="-1" class="liquid-pill px-3.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 cursor-pointer ${disliked ? 'text-rose-400 border-rose-400/60 bg-rose-500/10' : 'text-slate-200'}"><span class="text-lg leading-none">👎</span><span>${rev.dislikes.length}</span></button>
+
+          ${activeReactionPills}
+
+          <div class="relative">
+            <button
+              type="button"
+              data-toggle-emoji-picker="${esc(rev.id)}"
+              title="Добавить реакцию"
+              class="liquid-pill px-3 py-1.5 rounded-full text-xs cursor-pointer flex items-center gap-1 ${pickerOpen ? 'border-[#66c0f4]/60 bg-[#66c0f4]/15 text-white' : 'text-slate-300'}"
+            >
+              <span class="text-lg leading-none">😀</span>
+              <span class="text-sm font-bold leading-none">+</span>
+            </button>
+            ${pickerOpen ? `
+              <div class="anim-popover absolute left-0 bottom-full mb-2 z-30 liquid-glass-strong rounded-2xl p-2.5 grid grid-cols-6 gap-1.5 w-max shadow-2xl">
+                ${EMOJI_PALETTE.map(em => {
+                  const chosen = Array.isArray(reactions[em]) && reactions[em].includes(currentUser.steam_id);
+                  return `<button type="button" data-react-review="${esc(rev.id)}" data-emoji="${em}" class="emoji-btn w-10 h-10 rounded-xl flex items-center justify-center text-xl cursor-pointer ${chosen ? 'bg-[#d9ff00]/20 ring-1 ring-[#d9ff00]/60' : ''}">${em}</button>`;
+                }).join('')}
+              </div>
+            ` : ''}
+          </div>
+
+          <button type="button" data-toggle-comments="${rev.id}" class="liquid-pill px-3 py-1.5 rounded-full text-xs cursor-pointer ${cOpen ? 'text-[#66c0f4] border-[#66c0f4]/50' : ''}">💬 Комментарии (${rev.comments.length})</button>
+        </div>
+        ${own ? `<div class="flex items-center gap-1.5"><button type="button" data-edit-review="${rev.id}" class="liquid-pill px-3 py-1.5 rounded-full text-xs text-slate-200 hover:text-white cursor-pointer">✏️ Изменить</button><button type="button" data-del-review="${rev.id}" class="liquid-pill px-3 py-1.5 rounded-full text-xs text-rose-300 hover:border-rose-400/50 cursor-pointer">Удалить</button></div>` : ''}
+      `;
+    }
+
+    function renderCommentsDrawer(rev) {
+      return `
+        <div class="anim-drawer rounded-2xl bg-black/30 border border-white/10 p-3 space-y-2.5">
+          <div class="space-y-1.5">
+            ${rev.comments.map(c => `<div class="text-xs sm:text-sm leading-relaxed"><button type="button" data-open-profile="${esc(c.userId)}" class="font-bold hover:text-[#d9ff00] cursor-pointer">${esc(c.authorName)}</button>: <span class="text-slate-200">${esc(c.text)}</span></div>`).join('') || '<div class="text-xs text-slate-400">Комментариев пока нет</div>'}
+          </div>
+          <form data-comment-form="${esc(rev.id)}" class="flex items-center gap-2 relative">
+            <div class="relative shrink-0">
+              <button type="button" data-toggle-comment-emoji="${esc(rev.id)}" title="Вставить эмодзи" class="liquid-pill w-9 h-9 rounded-full flex items-center justify-center text-lg cursor-pointer">😀</button>
+              <div data-comment-emoji-box="${esc(rev.id)}" class="hidden anim-popover absolute left-0 bottom-full mb-2 z-30 liquid-glass-strong rounded-2xl p-2 grid grid-cols-6 gap-1 w-max shadow-2xl">
+                ${EMOJI_PALETTE.map(em => `<button type="button" data-insert-comment-emoji="${esc(rev.id)}" data-emoji="${em}" class="emoji-btn w-9 h-9 rounded-xl flex items-center justify-center text-lg cursor-pointer">${em}</button>`).join('')}
+              </div>
+            </div>
+            <input name="text" required placeholder="Написать комментарий..." class="flex-1 px-3.5 py-2 rounded-full bg-white/10 text-xs sm:text-sm text-white focus:outline-none focus:ring-1 focus:ring-[#66c0f4]" />
+            <button type="submit" class="btn-acid px-4 py-2 rounded-full text-xs cursor-pointer shrink-0">Отправить</button>
+          </form>
+        </div>
+      `;
+    }
+
+    function updateCardActions(revId) {
+      const rev = reviews.find(r => r.id === revId);
+      if (!rev) return;
+      const el = document.querySelector(`[data-card-actions="${CSS.escape(revId)}"]`);
+      if (el) el.innerHTML = renderCardActionsInner(rev);
+    }
+
+    function updateCardComments(revId) {
+      const rev = reviews.find(r => r.id === revId);
+      if (!rev) return;
+      const el = document.querySelector(`[data-card-comments="${CSS.escape(revId)}"]`);
+      if (el) el.innerHTML = openComments[revId] ? renderCommentsDrawer(rev) : '';
+      updateCardActions(revId);
+    }
+
+    function renderCard(rev, idx = 0, animate = false) {
+      const m = scoreMeta(rev.total);
+      const cOpen = Boolean(openComments[rev.id]);
+      const delay = Math.min(idx * 40, 240);
 
       return `
         <article data-review-card="${esc(rev.id)}" class="liquid-card ${animate ? 'anim-card' : ''} rounded-[26px] p-5 space-y-4 relative" ${animate ? `style="animation-delay:${delay}ms;"` : ''}>
@@ -499,43 +569,12 @@
           <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
             ${CRITERIA.map(c => `<div class="rounded-xl bg-white/[0.04] px-2.5 py-2 text-xs"><div class="flex justify-between"><span>${c.label}</span><b>${rev.scores[c.key]}/20</b></div><div class="h-1.5 rounded-full bg-white/10 mt-1 overflow-hidden"><div class="h-full rounded-full transition-all duration-500" style="width:${(rev.scores[c.key]/20)*100}%;background:${c.color}"></div></div></div>`).join('')}
           </div>
-          <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/10">
-            <div class="flex flex-wrap items-center gap-2 relative">
-              <button type="button" data-vote="${rev.id}" data-val="1" class="liquid-pill px-3.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 cursor-pointer ${liked ? 'text-[#d9ff00] border-[#d9ff00]/60 bg-[#d9ff00]/10' : 'text-slate-200'}"><span class="text-lg leading-none">👍</span><span>${rev.likes.length}</span></button>
-              <button type="button" data-vote="${rev.id}" data-val="-1" class="liquid-pill px-3.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 cursor-pointer ${disliked ? 'text-rose-400 border-rose-400/60 bg-rose-500/10' : 'text-slate-200'}"><span class="text-lg leading-none">👎</span><span>${rev.dislikes.length}</span></button>
-
-              ${activeReactionPills}
-
-              <div class="relative">
-                <button
-                  type="button"
-                  data-toggle-emoji-picker="${esc(rev.id)}"
-                  title="Добавить реакцию"
-                  class="liquid-pill px-3 py-1.5 rounded-full text-xs cursor-pointer flex items-center gap-1 ${pickerOpen ? 'border-[#66c0f4]/60 bg-[#66c0f4]/15 text-white' : 'text-slate-300'}"
-                >
-                  <span class="text-lg leading-none">😀</span>
-                  <span class="text-sm font-bold leading-none">+</span>
-                </button>
-                ${pickerOpen ? `
-                  <div class="anim-popover absolute left-0 bottom-full mb-2 z-30 liquid-glass-strong rounded-2xl p-2.5 grid grid-cols-6 gap-1.5 w-max shadow-2xl">
-                    ${EMOJI_PALETTE.map(em => {
-                      const chosen = Array.isArray(reactions[em]) && reactions[em].includes(currentUser.steam_id);
-                      return `<button type="button" data-react-review="${esc(rev.id)}" data-emoji="${em}" class="emoji-btn w-10 h-10 rounded-xl flex items-center justify-center text-xl cursor-pointer ${chosen ? 'bg-[#d9ff00]/20 ring-1 ring-[#d9ff00]/60' : ''}">${em}</button>`;
-                    }).join('')}
-                  </div>
-                ` : ''}
-              </div>
-
-              <button type="button" data-toggle-comments="${rev.id}" class="liquid-pill px-3 py-1.5 rounded-full text-xs cursor-pointer ${cOpen ? 'text-[#66c0f4] border-[#66c0f4]/50' : ''}">💬 Комментарии (${rev.comments.length})</button>
-            </div>
-            ${own ? `<div class="flex items-center gap-1.5"><button type="button" data-edit-review="${rev.id}" class="liquid-pill px-3 py-1.5 rounded-full text-xs text-slate-200 hover:text-white cursor-pointer">✏️ Изменить</button><button type="button" data-del-review="${rev.id}" class="liquid-pill px-3 py-1.5 rounded-full text-xs text-rose-300 hover:border-rose-400/50 cursor-pointer">Удалить</button></div>` : ''}
+          <div data-card-actions="${esc(rev.id)}" class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/10">
+            ${renderCardActionsInner(rev)}
           </div>
-          ${cOpen ? `
-            <div class="anim-drawer rounded-2xl bg-black/30 border border-white/10 p-3 space-y-2.5">
-              ${rev.comments.map(c => `<div class="text-xs"><button type="button" data-open-profile="${esc(c.userId)}" class="font-bold hover:text-[#d9ff00] cursor-pointer">${esc(c.authorName)}</button>: <span class="text-slate-200">${esc(c.text)}</span></div>`).join('') || '<div class="text-xs text-slate-400">Комментариев пока нет</div>'}
-              <form data-comment-form="${rev.id}" class="flex gap-2"><input name="text" required placeholder="Написать комментарий..." class="flex-1 px-3 py-2 rounded-full bg-white/10 text-xs text-white focus:outline-none focus:ring-1 focus:ring-[#66c0f4]" /><button type="submit" class="btn-acid px-4 py-2 rounded-full text-xs cursor-pointer">Отправить</button></form>
-            </div>
-          ` : ''}
+          <div data-card-comments="${esc(rev.id)}">
+            ${cOpen ? renderCommentsDrawer(rev) : ''}
+          </div>
         </article>`;
     }
 
@@ -602,12 +641,12 @@
       if (window.lucide) lucide.createIcons();
     }
 
-    function renderGameButtons(gamesList, showHours) {
+    function renderGameButtons(gamesList, showHours, animate = false) {
       lastDisplayedGames = gamesList;
       return gamesList.map((g, idx) => {
         const delay = Math.min(idx * 24, 240);
         return `
-          <button type="button" data-pick-idx="${idx}" style="animation-delay:${delay}ms;" class="anim-game-item liquid-pill rounded-2xl bg-white/[0.05] hover:bg-white/[0.11] hover:-translate-y-0.5 p-2.5 flex items-center gap-3 text-left cursor-pointer group">
+          <button type="button" data-pick-idx="${idx}" ${animate ? `style="animation-delay:${delay}ms;"` : ''} class="${animate ? 'anim-game-item' : ''} liquid-pill rounded-2xl bg-white/[0.05] hover:bg-white/[0.11] p-2.5 flex items-center gap-3 text-left cursor-pointer group">
             <img src="${esc(g.img)}" alt="${esc(g.title)}" class="w-20 h-10 rounded-xl object-cover shrink-0 group-hover:scale-105 transition duration-200" />
             <div class="min-w-0">
               <div class="text-xs font-bold truncate group-hover:text-[#d9ff00] transition">${esc(g.title)}</div>
@@ -618,7 +657,7 @@
       }).join('');
     }
 
-    async function renderSearchResults() {
+    async function renderSearchResults(animate = false) {
       const q = document.getElementById('steam-game-search').value.trim();
       const status = document.getElementById('steam-search-status');
       const box = document.getElementById('steam-search-results');
@@ -641,7 +680,7 @@
         status.innerHTML = `В вашей библиотеке Steam: ${myLibrary.length} игр <button type="button" id="btn-retry-lib" class="ml-2 underline text-[#66c0f4] cursor-pointer">Обновить</button>`;
         const retry = document.getElementById('btn-retry-lib');
         if (retry) retry.onclick = async () => { status.textContent = 'Обновление библиотеки Steam...'; await loadMyLibrary(); renderSearchResults(); };
-        box.innerHTML = renderGameButtons(filtered, true);
+        box.innerHTML = renderGameButtons(filtered, true, animate);
         return;
       }
       if (q.length < 2) {
@@ -654,7 +693,7 @@
       const d = await r.json();
       const list = d.games || [];
       status.textContent = `Найдено в Steam: ${list.length}`;
-      box.innerHTML = renderGameButtons(list, false);
+      box.innerHTML = renderGameButtons(list, false, animate);
     }
 
     function openRateStep(game) {
@@ -735,13 +774,13 @@
       void searchStep.offsetWidth;
       searchStep.classList.add('anim-step-left');
       document.getElementById('review-form').classList.add('hidden');
-      renderSearchResults();
+      renderSearchResults(true);
     };
     document.getElementById('btn-close-modal').onclick = document.getElementById('btn-cancel-review').onclick = () => document.getElementById('review-modal').classList.add('hidden');
     document.getElementById('review-modal').onclick = e => { if (e.target.id === 'review-modal') document.getElementById('review-modal').classList.add('hidden'); };
-    document.getElementById('tab-all-steam').onclick = () => { searchTab = 'all'; document.getElementById('tab-all-steam').classList.add('liquid-pill-active'); document.getElementById('tab-my-library').classList.remove('liquid-pill-active'); renderSearchResults(); };
-    document.getElementById('tab-my-library').onclick = () => { searchTab = 'library'; document.getElementById('tab-my-library').classList.add('liquid-pill-active'); document.getElementById('tab-all-steam').classList.remove('liquid-pill-active'); renderSearchResults(); };
-    document.getElementById('steam-game-search').oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(renderSearchResults, 240); };
+    document.getElementById('tab-all-steam').onclick = () => { searchTab = 'all'; document.getElementById('tab-all-steam').classList.add('liquid-pill-active'); document.getElementById('tab-my-library').classList.remove('liquid-pill-active'); renderSearchResults(true); };
+    document.getElementById('tab-my-library').onclick = () => { searchTab = 'library'; document.getElementById('tab-my-library').classList.add('liquid-pill-active'); document.getElementById('tab-all-steam').classList.remove('liquid-pill-active'); renderSearchResults(true); };
+    document.getElementById('steam-game-search').oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => renderSearchResults(false), 200); };
     document.getElementById('steam-search-results').onclick = e => {
       const b = e.target.closest('[data-pick-idx]');
       if (!b) return;
@@ -800,14 +839,28 @@
         pubBtn.textContent = editingReviewId ? 'Сохранить изменения' : 'Опубликовать';
       }
     };
-    document.getElementById('feed-search').oninput = document.getElementById('feed-sort').onchange = renderApp;
+    let feedSearchTimer = null;
+    function renderFeedListOnly() {
+      const q = document.getElementById('feed-search').value.trim().toLowerCase();
+      const sort = document.getElementById('feed-sort').value;
+      let list = reviews.filter(r => !q || `${r.gameTitle} ${r.authorName} ${r.text}`.toLowerCase().includes(q));
+      if (sort === 'highest') list.sort((a,b) => b.total - a.total);
+      else if (sort === 'lowest') list.sort((a,b) => a.total - b.total);
+      else if (sort === 'popular') list.sort((a,b) => (b.likes.length - b.dislikes.length) - (a.likes.length - a.dislikes.length));
+      document.getElementById('feed-list').innerHTML = list.length ? list.map((r, i) => renderCard(r, i, false)).join('') : '<div class="liquid-glass rounded-[26px] p-10 text-center text-sm text-slate-300">Ничего не найдено.</div>';
+    }
+    document.getElementById('feed-search').oninput = () => { clearTimeout(feedSearchTimer); feedSearchTimer = setTimeout(renderFeedListOnly, 120); };
+    document.getElementById('feed-sort').onchange = renderFeedListOnly;
 
     // Close emoji picker on outside click
     document.addEventListener('click', e => {
       if (openEmojiPickerId && !e.target.closest('[data-toggle-emoji-picker]') && !e.target.closest('.anim-popover')) {
         const prevId = openEmojiPickerId;
         openEmojiPickerId = null;
-        updateSingleCard(prevId);
+        updateCardActions(prevId);
+      }
+      if (!e.target.closest('[data-toggle-comment-emoji]') && !e.target.closest('[data-comment-emoji-box]')) {
+        document.querySelectorAll('[data-comment-emoji-box]').forEach(box => box.classList.add('hidden'));
       }
     });
 
@@ -821,8 +874,42 @@
         const id = ep.dataset.toggleEmojiPicker;
         const prevId = openEmojiPickerId;
         openEmojiPickerId = openEmojiPickerId === id ? null : id;
-        if (prevId && prevId !== id) updateSingleCard(prevId);
-        updateSingleCard(id);
+        if (prevId && prevId !== id) updateCardActions(prevId);
+        updateCardActions(id);
+        return;
+      }
+
+      const cep = e.target.closest('[data-toggle-comment-emoji]');
+      if (cep) {
+        e.stopPropagation();
+        const revId = cep.dataset.toggleCommentEmoji;
+        const box = document.querySelector(`[data-comment-emoji-box="${CSS.escape(revId)}"]`);
+        if (box) {
+          const willOpen = box.classList.contains('hidden');
+          document.querySelectorAll('[data-comment-emoji-box]').forEach(b => b.classList.add('hidden'));
+          if (willOpen) box.classList.remove('hidden');
+        }
+        return;
+      }
+
+      const cie = e.target.closest('[data-insert-comment-emoji]');
+      if (cie) {
+        e.stopPropagation();
+        const revId = cie.dataset.insertCommentEmoji;
+        const emoji = cie.dataset.emoji;
+        const form = document.querySelector(`[data-comment-form="${CSS.escape(revId)}"]`);
+        if (form) {
+          const input = form.querySelector('input[name="text"]');
+          if (input) {
+            const start = input.selectionStart ?? input.value.length;
+            const end = input.selectionEnd ?? input.value.length;
+            input.value = input.value.slice(0, start) + emoji + input.value.slice(end);
+            input.focus();
+            input.setSelectionRange(start + emoji.length, start + emoji.length);
+          }
+        }
+        const box = document.querySelector(`[data-comment-emoji-box="${CSS.escape(revId)}"]`);
+        if (box) box.classList.add('hidden');
         return;
       }
 
@@ -833,7 +920,6 @@
         const emoji = rx.dataset.emoji;
         openEmojiPickerId = null;
         lastAnimatedReaction = `${revId}:${emoji}`;
-        // Optimistic instant UI update
         const rev = reviews.find(x => x.id === revId);
         if (rev) {
           rev.reactions ||= {};
@@ -842,18 +928,15 @@
           const idx = list.indexOf(uid);
           if (idx >= 0) list.splice(idx, 1);
           else list.push(uid);
-          updateSingleCard(revId);
+          updateCardActions(revId);
+          setTimeout(() => { lastAnimatedReaction = null; }, 350);
         }
         fetch(`/api/reviews/${revId}/react`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ emoji })
         }).then(r => r.ok ? r.json() : null).then(d => {
-          if (d && d.reviews) {
-            reviews = d.reviews;
-            lastAnimatedReaction = null;
-            updateSingleCard(revId);
-          }
+          if (d && d.reviews) reviews = d.reviews;
         }).catch(() => {});
         return;
       }
@@ -863,7 +946,6 @@
         const revId = v.dataset.vote;
         const val = Number(v.dataset.val);
         const uid = currentUser.steam_id;
-        // Optimistic instant UI update (0 ms latency!)
         const rev = reviews.find(x => x.id === revId);
         if (rev) {
           if (val === 1) {
@@ -873,8 +955,8 @@
             if (rev.dislikes.includes(uid)) rev.dislikes = rev.dislikes.filter(x => x !== uid);
             else { rev.dislikes.push(uid); rev.likes = rev.likes.filter(x => x !== uid); }
           }
-          updateSingleCard(revId);
-          const freshBtn = document.querySelector(`[data-review-card="${CSS.escape(revId)}"] [data-vote="${CSS.escape(revId)}"][data-val="${val}"]`);
+          updateCardActions(revId);
+          const freshBtn = document.querySelector(`[data-card-actions="${CSS.escape(revId)}"] [data-vote="${CSS.escape(revId)}"][data-val="${val}"]`);
           if (freshBtn) freshBtn.classList.add('anim-pop');
         }
         fetch(`/api/reviews/${revId}/vote`, {
@@ -882,10 +964,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ vote: val })
         }).then(r => r.ok ? r.json() : null).then(d => {
-          if (d && d.reviews) {
-            reviews = d.reviews;
-            updateSingleCard(revId);
-          }
+          if (d && d.reviews) reviews = d.reviews;
         }).catch(() => {});
         return;
       }
@@ -894,7 +973,7 @@
       if (tc) {
         const revId = tc.dataset.toggleComments;
         openComments[revId] = !openComments[revId];
-        updateSingleCard(revId);
+        updateCardComments(revId);
         return;
       }
       const ed = e.target.closest('[data-edit-review]');
@@ -932,7 +1011,7 @@
       const r = await fetch(`/api/reviews/${revId}/comments`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ text }) });
       reviews = (await r.json()).reviews;
       openComments[revId] = true;
-      updateSingleCard(revId);
+      updateCardComments(revId);
       showToast('Комментарий добавлен');
     };
 
