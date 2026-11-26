@@ -574,7 +574,7 @@ app.get('/api/reviews', requireAuth, async (req, res) => {
 app.post('/api/reviews', requireAuth, async (req, res) => {
   try {
     const { appId, gameTitle, gameImg, scores, noNarrative, hoursPlayed, text } = req.body || {};
-    if ((appId === undefined || appId === null || appId === '') || !gameTitle || !text || !scores) {
+    if ((appId === undefined || appId === null || appId === '') || !gameTitle || !scores) {
       return res.status(400).json({ error: 'Заполните все обязательные поля обзора' });
     }
     const numAppIdCheck = Number(appId) || 0;
@@ -613,7 +613,7 @@ app.post('/api/reviews', requireAuth, async (req, res) => {
       hoursPlayed !== null && hoursPlayed !== '' && !Number.isNaN(Number(hoursPlayed)) ? Number(hoursPlayed) : null,
       ach ? ach.unlocked : null,
       ach ? ach.total : null,
-      String(text).trim().slice(0, 2000),
+      String(text || '').trim().slice(0, 2000),
       Date.now()
     ]);
 
@@ -630,7 +630,7 @@ app.put('/api/reviews/:id', requireAuth, async (req, res) => {
     if (rows[0].user_steam_id !== req.user.steam_id) return res.status(403).json({ error: 'Нет прав' });
 
     const { scores, noNarrative, hoursPlayed, text } = req.body || {};
-    if (!text || !scores) {
+    if (!scores) {
       return res.status(400).json({ error: 'Заполните текст и оценки' });
     }
     const skipNar = Boolean(noNarrative);
@@ -651,7 +651,7 @@ app.put('/api/reviews/:id', requireAuth, async (req, res) => {
       SET gameplay = $1, visuals = $2, narrative = $3, audio = $4, emotions = $5, total = $6, no_narrative = $7, hours_played = $8, text = $9,
           ach_unlocked = COALESCE($10, ach_unlocked), ach_total = COALESCE($11, ach_total)
       WHERE id = $12
-    `, [g, v, n, a, e, total, skipNar, hrs, String(text).trim().slice(0, 2000), ach ? ach.unlocked : null, ach ? ach.total : null, req.params.id]);
+    `, [g, v, n, a, e, total, skipNar, hrs, String(text || '').trim().slice(0, 2000), ach ? ach.unlocked : null, ach ? ach.total : null, req.params.id]);
 
     res.json({ ok: true, reviews: await hydrateReviews() });
   } catch (err) {
