@@ -218,9 +218,10 @@
           <img src="/logo.jpg" alt="AToQ" class="w-9 h-9 rounded-full object-cover border border-white/25 group-hover:scale-105 transition" />
           <span class="text-lg sm:text-xl font-black italic atoq-wordmark">AToQcritics</span>
         </button>
-        <nav class="flex items-center gap-1.5">
-          <button id="nav-feed" type="button" class="liquid-pill px-4 py-2 rounded-full text-xs sm:text-sm font-medium cursor-pointer">Лента</button>
-          <button id="nav-profile" type="button" class="liquid-pill px-4 py-2 rounded-full text-xs sm:text-sm font-medium cursor-pointer">Профиль</button>
+        <nav class="flex items-center gap-1 sm:gap-1.5">
+          <button id="nav-home" type="button" class="liquid-pill px-3.5 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-medium cursor-pointer">Главная</button>
+          <button id="nav-feed" type="button" class="liquid-pill px-3.5 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-medium cursor-pointer">Лента</button>
+          <button id="nav-profile" type="button" class="liquid-pill px-3.5 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-medium cursor-pointer">Профиль</button>
         </nav>
         <div class="flex items-center gap-2">
           <button id="btn-new-review" type="button" class="btn-acid px-4 py-2 rounded-full text-xs sm:text-sm cursor-pointer">+ Новый обзор</button>
@@ -230,7 +231,67 @@
     </header>
 
     <main class="flex-1 w-full max-w-6xl mx-auto px-3 sm:px-6 pt-4 pb-16">
-      <section id="view-feed" class="space-y-4 anim-view">
+      <section id="view-home" class="space-y-5 anim-view">
+        <!-- Hero KPI Summary Row -->
+        <div id="home-kpi-row" class="grid grid-cols-2 lg:grid-cols-4 gap-3.5"></div>
+
+        <!-- Score Category Distribution (от Слабо до Шедевр) -->
+        <div class="liquid-glass rounded-[28px] p-5 sm:p-6 space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#66c0f4]/15 text-[#66c0f4] border border-[#66c0f4]/30">Распределение оценок</span>
+              <h2 class="text-lg sm:text-xl font-bold mt-1">Игры по категориям оценок</h2>
+            </div>
+            <span id="home-dist-subtitle" class="text-xs text-slate-400"></span>
+          </div>
+          <!-- Stacked Liquid Glass Progress Bar -->
+          <div id="home-stacked-bar" class="h-4 rounded-full bg-white/[0.06] border border-white/10 overflow-hidden flex p-0.5 gap-0.5"></div>
+          <!-- 4 Category Cards: Слабо -> Неплохо -> Отлично -> Шедевр -->
+          <div id="home-category-grid" class="grid grid-cols-2 lg:grid-cols-4 gap-3"></div>
+        </div>
+
+        <!-- Site-wide Top Highest & Top Lowest Rated Games -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div class="liquid-glass rounded-[28px] p-5 sm:p-6 space-y-4">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-2xl bg-[#d9ff00]/15 border border-[#d9ff00]/40 flex items-center justify-center text-[#d9ff00] text-lg">🏆</div>
+                <div>
+                  <h3 class="text-base sm:text-lg font-bold text-white">Самые высокооценённые</h3>
+                  <p class="text-xs text-slate-400">Лучшие игры по среднему баллу сайта</p>
+                </div>
+              </div>
+            </div>
+            <div id="home-top-best" class="space-y-2.5"></div>
+          </div>
+
+          <div class="liquid-glass rounded-[28px] p-5 sm:p-6 space-y-4">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-2xl bg-rose-500/15 border border-rose-400/40 flex items-center justify-center text-rose-400 text-lg">💀</div>
+                <div>
+                  <h3 class="text-base sm:text-lg font-bold text-white">Самые низкооценённые</h3>
+                  <p class="text-xs text-slate-400">Игры с самым низким средним баллом</p>
+                </div>
+              </div>
+            </div>
+            <div id="home-top-worst" class="space-y-2.5"></div>
+          </div>
+        </div>
+
+        <!-- Most Active Critics Leaderboard -->
+        <div class="liquid-glass rounded-[28px] p-5 sm:p-6 space-y-4">
+          <div class="flex items-center justify-between gap-2">
+            <div>
+              <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#d9ff00]/15 text-[#d9ff00] border border-[#d9ff00]/35">Рейтинг активности</span>
+              <h3 class="text-lg sm:text-xl font-bold mt-1">Топ самых активных пользователей</h3>
+            </div>
+          </div>
+          <div id="home-active-users" class="space-y-2.5"></div>
+        </div>
+      </section>
+
+      <section id="view-feed" class="hidden space-y-4 anim-view">
         <div class="liquid-glass rounded-[26px] p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div>
             <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#66c0f4]/15 text-[#66c0f4] border border-[#66c0f4]/30">Общая лента Steam</span>
@@ -383,7 +444,7 @@
     const EMOJI_PALETTE = ['🔥', '❤️', '😂', '🤯', '💯', '👑', '🐐', '💀', '🤡', '🤮', '😢', '⚡', '🎯', '🫡'];
 
     let currentUser = null, users = [], reviews = [], myLibrary = [], libraryPrivate = false, libraryError = '';
-    let activeView = 'feed', profileUserId = null, searchTab = 'all', selectedGame = null, editingReviewId = null;
+    let activeView = 'home', profileUserId = null, searchTab = 'all', selectedGame = null, editingReviewId = null;
     let lastDisplayedGames = [];
     let modalScores = { gameplay: 16, visuals: 16, narrative: 16, audio: 16, emotions: 16 };
     let modalNoNarrative = false;
@@ -742,14 +803,210 @@
       }
     }
 
-    function renderApp(animateCards = false) {
-      const isFeed = activeView === 'feed';
-      document.getElementById('view-feed').classList.toggle('hidden', !isFeed);
-      document.getElementById('view-profile').classList.toggle('hidden', isFeed);
-      document.getElementById('nav-feed').classList.toggle('liquid-pill-active', isFeed);
-      document.getElementById('nav-profile').classList.toggle('liquid-pill-active', !isFeed && profileUserId === currentUser.steam_id);
+    function renderHomeStats() {
+      // Group reviews by unique game (Steam appId or custom lowercase title)
+      const gameMap = new Map();
+      reviews.forEach(r => {
+        const key = r.appId > 0 ? `steam_${r.appId}` : `custom_${(r.gameTitle || '').trim().toLowerCase()}`;
+        if (!gameMap.has(key)) {
+          gameMap.set(key, {
+            key,
+            appId: r.appId,
+            title: r.gameTitle,
+            img: r.gameImg,
+            scores: [],
+            authors: []
+          });
+        }
+        const entry = gameMap.get(key);
+        entry.scores.push(Number(r.total) || 0);
+        entry.authors.push(r.authorName);
+        if (!entry.img && r.gameImg) entry.img = r.gameImg;
+      });
 
-      if (isFeed) {
+      const uniqueGames = Array.from(gameMap.values()).map(g => ({
+        ...g,
+        avg: Math.round(g.scores.reduce((a, b) => a + b, 0) / g.scores.length),
+        count: g.scores.length
+      }));
+
+      const totalReviews = reviews.length;
+      const totalUniqueGames = uniqueGames.length;
+      const globalAvg = totalReviews
+        ? Math.round(reviews.reduce((a, b) => a + (Number(b.total) || 0), 0) / totalReviews)
+        : 0;
+      const avgMeta = totalReviews ? scoreMeta(globalAvg) : { l: 'Нет оценок', bg: 'rgba(255,255,255,0.1)', c: '#94a3b8' };
+
+      // 1) KPI Row
+      document.getElementById('home-kpi-row').innerHTML = `
+        <div class="liquid-glass rounded-[24px] p-4 sm:p-5 flex flex-col justify-between gap-2">
+          <div class="text-xs font-medium text-slate-400">Оценённых игр</div>
+          <div class="flex items-end justify-between gap-2">
+            <div class="text-3xl sm:text-4xl font-black text-white tabular-nums leading-none">${totalUniqueGames}</div>
+            <span class="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-[#66c0f4]/15 text-[#66c0f4] border border-[#66c0f4]/30">уникальных</span>
+          </div>
+        </div>
+        <div class="liquid-glass rounded-[24px] p-4 sm:p-5 flex flex-col justify-between gap-2">
+          <div class="text-xs font-medium text-slate-400">Всего обзоров</div>
+          <div class="flex items-end justify-between gap-2">
+            <div class="text-3xl sm:text-4xl font-black text-[#d9ff00] tabular-nums leading-none">${totalReviews}</div>
+            <span class="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-[#d9ff00]/15 text-[#d9ff00] border border-[#d9ff00]/30">в ленте</span>
+          </div>
+        </div>
+        <div class="liquid-glass rounded-[24px] p-4 sm:p-5 flex flex-col justify-between gap-2">
+          <div class="text-xs font-medium text-slate-400">Средний балл сайта</div>
+          <div class="flex items-end justify-between gap-2">
+            <div class="text-3xl sm:text-4xl font-black tabular-nums leading-none" style="color:${totalReviews ? avgMeta.c : '#94a3b8'}">${totalReviews ? globalAvg : '—'}</div>
+            <span class="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full ${totalReviews ? 'text-[#090c12]' : 'text-slate-400 bg-white/10'}" ${totalReviews ? `style="background:${avgMeta.bg};"` : ''}>${avgMeta.l}</span>
+          </div>
+        </div>
+        <div class="liquid-glass rounded-[24px] p-4 sm:p-5 flex flex-col justify-between gap-2">
+          <div class="text-xs font-medium text-slate-400">Критиков на сайте</div>
+          <div class="flex items-end justify-between gap-2">
+            <div class="text-3xl sm:text-4xl font-black text-[#eaf4ff] tabular-nums leading-none">${users.length}</div>
+            <span class="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-white/10 text-slate-300 border border-white/15">Steam</span>
+          </div>
+        </div>
+      `;
+
+      // 2) Categories from Слабо (0-54) to Шедевр (90-100) by unique rated games
+      const cats = [
+        { key: 'weak', label: 'Слабо', range: '0–54', count: uniqueGames.filter(g => g.avg < 55).length, color: '#fb7185', bg: 'linear-gradient(135deg, #fb7185 0%, #f43f5e 100%)', fill: 'rgba(244,63,94,0.28)' },
+        { key: 'ok', label: 'Неплохо', range: '55–74', count: uniqueGames.filter(g => g.avg >= 55 && g.avg < 75).length, color: '#fbbf24', bg: 'linear-gradient(135deg, #fde047 0%, #f59e0b 100%)', fill: 'rgba(251,191,36,0.26)' },
+        { key: 'great', label: 'Отлично', range: '75–89', count: uniqueGames.filter(g => g.avg >= 75 && g.avg < 90).length, color: '#38e8b0', bg: 'linear-gradient(135deg, #5ce1e6 0%, #34d399 100%)', fill: 'rgba(56,232,176,0.28)' },
+        { key: 'master', label: 'Шедевр', range: '90–100', count: uniqueGames.filter(g => g.avg >= 90).length, color: '#d9ff00', bg: 'linear-gradient(135deg, #d9ff00 0%, #9ef01a 100%)', fill: 'rgba(217,255,0,0.28)' }
+      ];
+
+      document.getElementById('home-dist-subtitle').textContent = totalUniqueGames
+        ? `Всего игр в статистике: ${totalUniqueGames}`
+        : 'Появится после первых оценок';
+
+      const stackedEl = document.getElementById('home-stacked-bar');
+      if (!totalUniqueGames) {
+        stackedEl.innerHTML = '<div class="w-full h-full rounded-full bg-white/[0.04]"></div>';
+      } else {
+        stackedEl.innerHTML = cats
+          .filter(c => c.count > 0)
+          .map(c => {
+            const pct = (c.count / totalUniqueGames) * 100;
+            return `<div title="${c.label}: ${c.count} (${Math.round(pct)}%)" class="h-full rounded-full transition-all duration-500" style="width:${pct}%; background:${c.bg};"></div>`;
+          }).join('');
+      }
+
+      document.getElementById('home-category-grid').innerHTML = cats.map(c => {
+        const pct = totalUniqueGames ? Math.round((c.count / totalUniqueGames) * 100) : 0;
+        return `
+          <div class="relative overflow-hidden rounded-2xl bg-white/[0.04] border border-white/10 p-3.5 space-y-2">
+            <div class="absolute inset-y-0 left-0 transition-all duration-500" style="width:${pct}%; background:${c.fill};"></div>
+            <div class="relative z-10 flex items-center justify-between gap-2">
+              <span class="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold text-[#090c12]" style="background:${c.bg};">${c.label}</span>
+              <span class="text-[11px] text-slate-300 font-medium">${c.range}</span>
+            </div>
+            <div class="relative z-10 flex items-baseline justify-between pt-1">
+              <span class="text-2xl font-black text-white tabular-nums">${c.count}</span>
+              <span class="text-xs font-semibold text-slate-300 tabular-nums">${pct}%</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // 3) & 4) Top Highest & Top Lowest Rated Games across the whole site
+      function renderSiteGameRow(g, idx) {
+        const m = scoreMeta(g.avg);
+        const cover = g.img || (g.appId > 0 ? `/api/steam/cover/${g.appId}` : makeFallbackCover(g.title));
+        return `
+          <button
+            type="button"
+            data-home-jump-game="${esc(g.title)}"
+            class="w-full rounded-2xl bg-white/[0.045] hover:bg-white/[0.1] border border-white/[0.09] hover:border-white/20 p-2.5 flex items-center gap-3 text-left transition cursor-pointer group"
+          >
+            <span class="w-6 text-center text-xs font-black text-slate-400 shrink-0">#${idx + 1}</span>
+            <img
+              src="${esc(cover)}"
+              data-appid="${g.appId}"
+              onerror="handleCoverError(this)"
+              alt="${esc(g.title)}"
+              class="w-20 h-10 rounded-xl object-cover bg-[#121a27] shrink-0 group-hover:scale-105 transition"
+            />
+            <div class="min-w-0 flex-1">
+              <div class="text-sm font-bold text-white truncate group-hover:text-[#d9ff00] transition">${esc(g.title)}</div>
+              <div class="text-[11px] text-slate-400 truncate">
+                ${g.count === 1 ? `Оценил: ${esc(g.authors[0])}` : `Оценок: ${g.count}`}
+              </div>
+            </div>
+            <div class="rounded-xl min-w-[48px] px-2.5 py-1.5 text-center shrink-0" style="background:${m.bg}; box-shadow:${m.shadow};">
+              <div class="text-base font-black leading-none text-[#090c12] tabular-nums">${g.avg}</div>
+            </div>
+          </button>
+        `;
+      }
+
+      const bestGames = [...uniqueGames].sort((a, b) => b.avg - a.avg || b.count - a.count).slice(0, 5);
+      const worstGames = [...uniqueGames].sort((a, b) => a.avg - b.avg || b.count - a.count).slice(0, 5);
+
+      document.getElementById('home-top-best').innerHTML = bestGames.length
+        ? bestGames.map(renderSiteGameRow).join('')
+        : '<div class="text-xs text-slate-400 py-6 text-center">Пока нет оценённых игр</div>';
+
+      document.getElementById('home-top-worst').innerHTML = worstGames.length
+        ? worstGames.map(renderSiteGameRow).join('')
+        : '<div class="text-xs text-slate-400 py-6 text-center">Пока нет оценённых игр</div>';
+
+      // 5) Top Most Active Users by review count
+      const userStats = users.map(u => {
+        const uRevs = reviews.filter(r => r.userId === u.steam_id);
+        const avg = uRevs.length ? Math.round(uRevs.reduce((a, b) => a + (Number(b.total) || 0), 0) / uRevs.length) : null;
+        return { ...u, reviewCount: uRevs.length, avg };
+      }).sort((a, b) => b.reviewCount - a.reviewCount);
+
+      const maxReviews = Math.max(1, ...userStats.map(u => u.reviewCount));
+      const medalColors = ['#d9ff00', '#5ce1e6', '#fbbf24'];
+
+      document.getElementById('home-active-users').innerHTML = userStats.length
+        ? userStats.map((u, idx) => {
+            const pct = u.reviewCount ? Math.max(6, Math.round((u.reviewCount / maxReviews) * 100)) : 0;
+            const rankColor = medalColors[idx] || '#94a3b8';
+            const avgM = u.avg !== null ? scoreMeta(u.avg) : null;
+            return `
+              <button
+                type="button"
+                data-open-profile="${esc(u.steam_id)}"
+                class="w-full relative overflow-hidden rounded-2xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 hover:border-white/20 p-3 flex items-center gap-3.5 text-left transition cursor-pointer group"
+              >
+                <div class="absolute inset-y-0 left-0 transition-all duration-500 pointer-events-none" style="width:${pct}%; background:linear-gradient(90deg, rgba(102,192,244,0.16) 0%, rgba(217,255,0,0.12) 100%);"></div>
+                <span class="relative z-10 w-7 text-center text-sm font-black shrink-0 tabular-nums" style="color:${rankColor}">#${idx + 1}</span>
+                <img src="${esc(u.avatar || '/logo.jpg')}" class="relative z-10 w-10 h-10 rounded-full object-cover border border-white/20 shrink-0 group-hover:scale-105 transition" />
+                <div class="relative z-10 min-w-0 flex-1">
+                  <div class="text-sm sm:text-base font-bold text-white truncate group-hover:text-[#d9ff00] transition">${esc(u.name)}</div>
+                  <div class="text-[11px] text-slate-400">
+                    ${u.avg !== null ? `Средний балл: <span class="font-bold" style="color:${avgM.c}">${u.avg}</span>` : 'Пока без оценок'}
+                  </div>
+                </div>
+                <div class="relative z-10 shrink-0 px-3 py-1.5 rounded-full bg-white/[0.08] border border-white/15 text-xs sm:text-sm font-extrabold text-white tabular-nums">
+                  ${u.reviewCount} <span class="font-normal text-slate-300 text-[11px]">оц.</span>
+                </div>
+              </button>
+            `;
+          }).join('')
+        : '<div class="text-xs text-slate-400 py-6 text-center">Пока нет пользователей</div>';
+    }
+
+    function renderApp(animateCards = false) {
+      const isHome = activeView === 'home';
+      const isFeed = activeView === 'feed';
+      const isProfile = activeView === 'profile';
+
+      document.getElementById('view-home').classList.toggle('hidden', !isHome);
+      document.getElementById('view-feed').classList.toggle('hidden', !isFeed);
+      document.getElementById('view-profile').classList.toggle('hidden', !isProfile);
+
+      document.getElementById('nav-home').classList.toggle('liquid-pill-active', isHome);
+      document.getElementById('nav-feed').classList.toggle('liquid-pill-active', isFeed);
+      document.getElementById('nav-profile').classList.toggle('liquid-pill-active', isProfile && profileUserId === currentUser.steam_id);
+
+      if (isHome) {
+        renderHomeStats();
+      } else if (isFeed) {
         document.getElementById('community-strip').innerHTML = users.map(u => `
           <button type="button" data-open-profile="${esc(u.steam_id)}" class="liquid-pill pl-1.5 pr-3 py-1 rounded-full flex items-center gap-2 shrink-0 cursor-pointer">
             <img src="${esc(u.avatar || '/logo.jpg')}" class="w-6 h-6 rounded-full" />
@@ -918,7 +1175,8 @@
       ring.style.setProperty('--ring-color', m.c);
     }
 
-    document.getElementById('nav-brand').onclick = document.getElementById('nav-feed').onclick = document.getElementById('btn-back-to-feed').onclick = () => { activeView = 'feed'; openEmojiPickerId = null; renderApp(true); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+    document.getElementById('nav-brand').onclick = document.getElementById('nav-home').onclick = () => { activeView = 'home'; openEmojiPickerId = null; renderApp(true); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+    document.getElementById('nav-feed').onclick = document.getElementById('btn-back-to-feed').onclick = () => { activeView = 'feed'; openEmojiPickerId = null; renderApp(true); window.scrollTo({ top: 0, behavior: 'smooth' }); };
     document.getElementById('nav-profile').onclick = () => { activeView = 'profile'; profileUserId = currentUser.steam_id; openEmojiPickerId = null; renderApp(true); window.scrollTo({ top: 0, behavior: 'smooth' }); };
     document.getElementById('btn-logout').onclick = async () => { await fetch('/api/logout', { method: 'POST' }); location.reload(); };
     document.getElementById('btn-new-review').onclick = () => {
@@ -1209,6 +1467,14 @@
     });
 
     document.getElementById('app-shell').onclick = async e => {
+      const jg = e.target.closest('[data-home-jump-game]');
+      if (jg) {
+        activeView = 'feed';
+        document.getElementById('feed-search').value = jg.dataset.homeJumpGame;
+        renderApp(true);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
       const p = e.target.closest('[data-open-profile]');
       if (p) { activeView = 'profile'; profileUserId = p.dataset.openProfile; openEmojiPickerId = null; renderApp(true); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
 
