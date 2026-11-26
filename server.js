@@ -10,15 +10,9 @@ const SESSION_SECRET = (process.env.SESSION_SECRET || 'atoqcritics-dev-secret-ch
 const DATABASE_URL = (process.env.DATABASE_URL || '').trim().replace(/^["']|["']$/g, '');
 
 function getBaseUrl(req) {
-  let raw = (process.env.BASE_URL || '').trim().replace(/^["']|["']$/g, '').replace(/\/+$/, '');
-  if (raw) {
-    if (!/^https?:\/\//i.test(raw)) {
-      raw = (raw.includes('localhost') || raw.includes('127.0.0.1') ? 'http://' : 'https://') + raw;
-    }
-    return raw;
-  }
-  const proto = (req.headers['x-forwarded-proto'] || req.protocol || 'https').split(',')[0].trim();
-  const host = req.headers['x-forwarded-host'] || req.get('host');
+  const host = (req.headers['x-forwarded-host'] || req.get('host') || '').split(',')[0].trim();
+  const isLocal = host.startsWith('localhost') || host.startsWith('127.0.0.1');
+  const proto = isLocal ? 'http' : 'https';
   return `${proto}://${host}`;
 }
 
