@@ -386,7 +386,7 @@
         </div>
         <button id="btn-close-modal" type="button" class="liquid-pill p-2 rounded-full cursor-pointer"><i data-lucide="x" class="w-4 h-4"></i></button>
       </div>
-      <div class="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
+      <div class="p-4 sm:p-6 overflow-y-auto overscroll-contain flex-1 space-y-4">
         <div id="modal-step-search" class="space-y-4">
           <div class="flex flex-wrap gap-1.5 p-1 rounded-2xl sm:rounded-full bg-white/[0.04] border border-white/10 w-fit">
             <button id="tab-all-steam" type="button" class="liquid-pill liquid-pill-active px-3.5 py-2 rounded-full text-xs font-semibold cursor-pointer">Весь каталог Steam</button>
@@ -400,7 +400,7 @@
               <button id="clear-steam-search" type="button" title="Очистить поиск" class="hidden absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white/10 hover:bg-white/20 text-xs text-slate-300 hover:text-white flex items-center justify-center transition cursor-pointer">✕</button>
             </div>
             <div id="steam-search-status" class="text-xs text-slate-400"></div>
-            <div id="steam-search-results" class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[48vh] overflow-y-auto pr-1"></div>
+            <div id="steam-search-results" class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[48vh] overflow-y-auto overscroll-contain pr-1"></div>
           </div>
 
           <div id="custom-game-panel" class="hidden space-y-4">
@@ -529,6 +529,39 @@
     function sliderTrackBg(val, color, maxVal = 20) {
       const pct = Math.min(100, Math.max(0, (Number(val) / maxVal) * 100));
       return `linear-gradient(to right, ${color} 0%, ${color} ${pct}%, rgba(255,255,255,0.10) ${pct}%, rgba(255,255,255,0.10) 100%)`;
+    }
+
+    let lockedScrollY = 0;
+    let isScrollLocked = false;
+
+    function openModal() {
+      if (!isScrollLocked) {
+        lockedScrollY = window.scrollY || window.pageYOffset || 0;
+        isScrollLocked = true;
+        document.documentElement.style.overflow = 'hidden';
+        document.body.style.overflow = 'hidden';
+        document.body.style.position = 'fixed';
+        document.body.style.top = `-${lockedScrollY}px`;
+        document.body.style.left = '0';
+        document.body.style.right = '0';
+        document.body.style.width = '100%';
+      }
+      document.getElementById('review-modal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('review-modal').classList.add('hidden');
+      if (isScrollLocked) {
+        isScrollLocked = false;
+        document.documentElement.style.overflow = '';
+        document.body.style.overflow = '';
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.left = '';
+        document.body.style.right = '';
+        document.body.style.width = '';
+        window.scrollTo(0, lockedScrollY);
+      }
     }
 
     function showToast(msg) {
@@ -1293,7 +1326,7 @@
       customCoverDataUrl = '';
       document.getElementById('custom-game-preview-wrap').classList.add('hidden');
       setSearchTab('all');
-      document.getElementById('review-modal').classList.remove('hidden');
+      openModal();
       const searchStep = document.getElementById('modal-step-search');
       searchStep.classList.remove('hidden', 'anim-step-left');
       void searchStep.offsetWidth;
@@ -1301,8 +1334,8 @@
       document.getElementById('review-form').classList.add('hidden');
       renderSearchResults(true);
     };
-    document.getElementById('btn-close-modal').onclick = document.getElementById('btn-cancel-review').onclick = () => document.getElementById('review-modal').classList.add('hidden');
-    document.getElementById('review-modal').onclick = e => { if (e.target.id === 'review-modal') document.getElementById('review-modal').classList.add('hidden'); };
+    document.getElementById('btn-close-modal').onclick = document.getElementById('btn-cancel-review').onclick = () => closeModal();
+    document.getElementById('review-modal').onclick = e => { if (e.target.id === 'review-modal') closeModal(); };
     let customCoverDataUrl = '';
 
     let existingCustomGamesList = [];
@@ -1520,7 +1553,7 @@
         if (r.ok) {
           reviews = respData.reviews;
           editingReviewId = null;
-          document.getElementById('review-modal').classList.add('hidden');
+          closeModal();
           document.getElementById('input-review-text').value = '';
           renderApp();
           showToast(isEdit ? 'Обзор обновлён!' : 'Обзор опубликован!');
@@ -1724,7 +1757,7 @@
         document.getElementById('btn-publish-review').textContent = 'Опубликовать';
         document.getElementById('input-review-text').value = '';
         document.getElementById('input-hours').value = '';
-        document.getElementById('review-modal').classList.remove('hidden');
+        openModal();
         openRateStep({ appId: rev.appId, title: rev.gameTitle, img: rev.gameImg });
         return;
       }
@@ -1742,7 +1775,7 @@
         document.getElementById('btn-publish-review').textContent = 'Сохранить изменения';
         document.getElementById('input-hours').value = rev.hoursPlayed !== null && rev.hoursPlayed !== undefined ? rev.hoursPlayed : '';
         document.getElementById('input-review-text').value = rev.text || '';
-        document.getElementById('review-modal').classList.remove('hidden');
+        openModal();
         openRateStep({ appId: rev.appId, title: rev.gameTitle, img: rev.gameImg });
         return;
       }
@@ -1787,6 +1820,10 @@
     bindClearSearch('feed-search', 'clear-feed-search', () => renderFeedListOnly());
     bindClearSearch('profile-search', 'clear-profile-search', () => renderProfileListOnly(false));
     bindClearSearch('steam-game-search', 'clear-steam-search', () => renderSearchResults(false));
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && isScrollLocked) closeModal();
+    });
 
     boot();
   </script>
