@@ -667,6 +667,11 @@ app.post('/api/reviews/:id/vote', requireAuth, async (req, res) => {
   try {
     const voteVal = Number(req.body && req.body.vote);
     if (voteVal !== 1 && voteVal !== -1) return res.status(400).json({ error: 'Invalid vote' });
+    const revOwner = await pool.query('SELECT user_steam_id FROM reviews WHERE id = $1', [req.params.id]);
+    if (!revOwner.rows[0]) return res.status(404).json({ error: 'Обзор не найден' });
+    if (revOwner.rows[0].user_steam_id === req.user.steam_id) {
+      return res.status(403).json({ error: 'Нельзя оценивать собственный обзор' });
+    }
     const { rows } = await pool.query('SELECT vote FROM votes WHERE review_id = $1 AND user_steam_id = $2', [req.params.id, req.user.steam_id]);
     if (rows[0] && rows[0].vote === voteVal) {
       await pool.query('DELETE FROM votes WHERE review_id = $1 AND user_steam_id = $2', [req.params.id, req.user.steam_id]);
@@ -690,6 +695,11 @@ app.post('/api/reviews/:id/react', requireAuth, async (req, res) => {
     const emoji = String((req.body && req.body.emoji) || '').trim();
     if (!ALLOWED_EMOJIS.includes(emoji)) {
       return res.status(400).json({ error: 'Неподдерживаемый эмодзи' });
+    }
+    const revOwner = await pool.query('SELECT user_steam_id FROM reviews WHERE id = $1', [req.params.id]);
+    if (!revOwner.rows[0]) return res.status(404).json({ error: 'Обзор не найден' });
+    if (revOwner.rows[0].user_steam_id === req.user.steam_id) {
+      return res.status(403).json({ error: 'Нельзя ставить реакции на собственный обзор' });
     }
     const { rows } = await pool.query(
       'SELECT 1 FROM reactions WHERE review_id = $1 AND user_steam_id = $2 AND emoji = $3',
