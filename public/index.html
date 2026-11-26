@@ -68,7 +68,8 @@
       <h1 class="text-3xl sm:text-4xl font-black italic tracking-tight atoq-wordmark">AToQcritics</h1>
       <p class="mt-2 text-sm text-slate-300 max-w-sm mx-auto">Войдите через свой аккаунт Steam, чтобы видеть библиотеку игр, оценивать тайтлы по 100-балльной шкале и делиться обзорами.</p>
 
-      <a href="/auth/steam" class="btn-steam mt-7 w-full py-4 px-6 rounded-2xl flex items-center justify-center gap-3 text-base font-semibold">
+      <div id="auth-error-box" class="hidden mt-4 rounded-2xl bg-rose-500/15 border border-rose-400/40 px-4 py-3 text-xs text-rose-200 text-left"></div>
+      <a id="steam-login-link" href="/auth/steam" class="btn-steam mt-6 w-full py-4 px-6 rounded-2xl flex items-center justify-center gap-3 text-base font-semibold">
         <svg class="w-6 h-6 fill-current text-[#66c0f4]" viewBox="0 0 24 24"><path d="M11.979 0C5.678 0 .511 4.86.022 11.037l6.432 2.658c.545-.371 1.203-.59 1.912-.59.063 0 .125.004.188.006l2.861-4.142V8.91c0-2.495 2.028-4.524 4.524-4.524 2.494 0 4.524 2.031 4.524 4.527s-2.03 4.525-4.524 4.525h-.105l-4.076 2.911c0 .052.004.105.004.159 0 1.875-1.515 3.396-3.39 3.396-1.635 0-3.016-1.173-3.331-2.727L.436 15.27C1.862 20.307 6.486 24 11.979 24c6.627 0 11.999-5.373 11.999-12S18.606 0 11.979 0z"/></svg>
         <span>Войти через Steam</span>
       </a>
@@ -199,6 +200,18 @@
     const scoreMeta = s => s >= 90 ? { l: 'Шедевр', c: '#d9ff00' } : s >= 75 ? { l: 'Отлично', c: '#5ce1e6' } : s >= 55 ? { l: 'Неплохо', c: '#fbbf24' } : { l: 'Слабо', c: '#fb7185' };
 
     async function boot() {
+      const params = new URLSearchParams(window.location.search);
+      const authErr = params.get('auth_err');
+      if (authErr) {
+        const box = document.getElementById('auth-error-box');
+        if (box) { box.textContent = authErr; box.classList.remove('hidden'); }
+      }
+      const loginLink = document.getElementById('steam-login-link');
+      if (loginLink) {
+        loginLink.addEventListener('click', () => {
+          loginLink.querySelector('span').textContent = 'Переход в Steam...';
+        });
+      }
       const meRes = await fetch('/api/me');
       const meData = await meRes.json();
       currentUser = meData.user;
