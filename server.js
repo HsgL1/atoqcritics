@@ -83,6 +83,25 @@ async function fetchSteamProfile(steamId) {
   return { found: false };
 }
 
+async function fetchSteamAchievements(steamId, appId) {
+  if (!STEAM_API_KEY || !steamId || !appId) return null;
+  try {
+    const url = `https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v1/?key=${encodeURIComponent(STEAM_API_KEY)}&steamid=${encodeURIComponent(steamId)}&appid=${encodeURIComponent(appId)}`;
+    const res = await fetchWithRetry(url, 2);
+    if (!res.ok) return null;
+    const data = await res.response.json();
+    const stats = data && data.playerstats;
+    if (!stats || !stats.success || !Array.isArray(stats.achievements) || stats.achievements.length === 0) {
+      return null;
+    }
+    const total = stats.achievements.length;
+    const unlocked = stats.achievements.filter(a => Number(a.achieved) === 1).length;
+    return { unlocked, total };
+  } catch {
+    return null;
+  }
+}
+
 // ==================== SIGNED COOKIE AUTH ====================
 const COOKIE_NAME = 'atoq_steam_sid';
 
@@ -203,7 +222,24 @@ async function initDb() {
       PRIMARY KEY (review_id, user_steam_id, emoji)
     );
   `);
+  await pool.query(`
+    ALTER TABLE reviews ADD COLUMN IF NOT EXISTS ach_unlocked INTEGER;
+    ALTER TABLE reviews ADD COLUMN IF NOT EXISTS ach_total INTEGER;
+  `);
   console.log('Облачная база PostgreSQL подключена и таблицы готовы.');
+  // Backfill achievements for existing reviews in background
+  backfillAchievements().catch(() => {});
+}
+
+async function backfillAchievements() {
+  if (!STEAM_API_KEY) return;
+  const { rows } = await pool.query('SELECT id, user_steam_id, app_id FROM reviews WHERE ach_total IS NULL LIMIT 50');
+  for (const r of rows) {
+    const ach = await fetchSteamAchievements(r.user_steam_id, r.app_id);
+    if (ach) {
+      await pool.query('UPDATE reviews SET ach_unlocked = $1, ach_total = $2 WHERE id = $3', [ach.unlocked, ach.total, r.id]);
+    }
+  }
 }
 
 // ==================== EXPRESS APP ====================
@@ -487,6 +523,8 @@ async function hydrateReviews() {
     },
     total: r.total,
     hoursPlayed: r.hours_played,
+    achUnlocked: r.ach_unlocked !== null && r.ach_unlocked !== undefined ? Number(r.ach_unlocked) : null,
+    achTotal: r.ach_total !== null && r.ach_total !== undefined ? Number(r.ach_total) : null,
     text: r.text,
     createdAt: Number(r.created_at),
     likes: likesMap[r.id] || [],
@@ -519,9 +557,11 @@ app.post('/api/reviews', requireAuth, async (req, res) => {
     const total = g + v + n + a + e;
     const id = 'rev_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
 
+    const ach = await fetchSteamAchievements(req.user.steam_id, Number(appId));
+
     await pool.query(`
-      INSERT INTO reviews (id, user_steam_id, app_id, game_title, game_img, gameplay, visuals, narrative, audio, emotions, total, hours_played, text, created_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      INSERT INTO reviews (id, user_steam_id, app_id, game_title, game_img, gameplay, visuals, narrative, audio, emotions, total, hours_played, ach_unlocked, ach_total, text, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
     `, [
       id,
       req.user.steam_id,
@@ -530,6 +570,8 @@ app.post('/api/reviews', requireAuth, async (req, res) => {
       gameImg || `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${Number(appId)}/header.jpg`,
       g, v, n, a, e, total,
       hoursPlayed !== null && hoursPlayed !== '' && !Number.isNaN(Number(hoursPlayed)) ? Number(hoursPlayed) : null,
+      ach ? ach.unlocked : null,
+      ach ? ach.total : null,
       String(text).trim().slice(0, 2000),
       Date.now()
     ]);
@@ -542,7 +584,7 @@ app.post('/api/reviews', requireAuth, async (req, res) => {
 
 app.put('/api/reviews/:id', requireAuth, async (req, res) => {
   try {
-    const { rows } = await pool.query('SELECT user_steam_id FROM reviews WHERE id = $1', [req.params.id]);
+    const { rows } = await pool.query('SELECT user_steam_id, app_id FROM reviews WHERE id = $1', [req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: 'Обзор не найден' });
     if (rows[0].user_steam_id !== req.user.steam_id) return res.status(403).json({ error: 'Нет прав' });
 
@@ -559,11 +601,14 @@ app.put('/api/reviews/:id', requireAuth, async (req, res) => {
     const total = g + v + n + a + e;
     const hrs = hoursPlayed !== null && hoursPlayed !== '' && !Number.isNaN(Number(hoursPlayed)) ? Number(hoursPlayed) : null;
 
+    const ach = await fetchSteamAchievements(req.user.steam_id, rows[0].app_id);
+
     await pool.query(`
       UPDATE reviews
-      SET gameplay = $1, visuals = $2, narrative = $3, audio = $4, emotions = $5, total = $6, hours_played = $7, text = $8
-      WHERE id = $9
-    `, [g, v, n, a, e, total, hrs, String(text).trim().slice(0, 2000), req.params.id]);
+      SET gameplay = $1, visuals = $2, narrative = $3, audio = $4, emotions = $5, total = $6, hours_played = $7, text = $8,
+          ach_unlocked = COALESCE($9, ach_unlocked), ach_total = COALESCE($10, ach_total)
+      WHERE id = $11
+    `, [g, v, n, a, e, total, hrs, String(text).trim().slice(0, 2000), ach ? ach.unlocked : null, ach ? ach.total : null, req.params.id]);
 
     res.json({ ok: true, reviews: await hydrateReviews() });
   } catch (err) {
