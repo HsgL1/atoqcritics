@@ -577,6 +577,14 @@ app.post('/api/reviews', requireAuth, async (req, res) => {
     if ((appId === undefined || appId === null || appId === '') || !gameTitle || !text || !scores) {
       return res.status(400).json({ error: 'Заполните все обязательные поля обзора' });
     }
+    const numAppIdCheck = Number(appId) || 0;
+    const dupRes = numAppIdCheck > 0
+      ? await pool.query('SELECT id FROM reviews WHERE user_steam_id = $1 AND app_id = $2 LIMIT 1', [req.user.steam_id, numAppIdCheck])
+      : await pool.query('SELECT id FROM reviews WHERE user_steam_id = $1 AND app_id = 0 AND LOWER(TRIM(game_title)) = LOWER(TRIM($2)) LIMIT 1', [req.user.steam_id, String(gameTitle)]);
+    if (dupRes.rows[0]) {
+      return res.status(409).json({ error: 'Вы уже оценили эту игру. Отредактируйте существующий обзор.' });
+    }
+
     const skipNar = Boolean(noNarrative);
     const maxScore = skipNar ? 25 : 20;
     const clamp = v => Math.min(maxScore, Math.max(0, Math.round(Number(v) || 0)));
