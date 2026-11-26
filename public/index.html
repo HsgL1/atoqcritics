@@ -1093,10 +1093,34 @@
       if (window.lucide) lucide.createIcons();
     }
 
+    function hasUserReviewedGame(appId, title) {
+      if (!currentUser) return false;
+      const numId = Number(appId) || 0;
+      const normTitle = String(title || '').trim().toLowerCase();
+      return reviews.some(r =>
+        r.userId === currentUser.steam_id &&
+        (numId > 0
+          ? Number(r.appId) === numId
+          : (Number(r.appId) === 0 && String(r.gameTitle || '').trim().toLowerCase() === normTitle))
+      );
+    }
+
     function renderGameButtons(gamesList, showHours, animate = false) {
       lastDisplayedGames = gamesList;
       return gamesList.map((g, idx) => {
         const delay = Math.min(idx * 24, 240);
+        const reviewed = hasUserReviewedGame(g.appId, g.title);
+        if (reviewed) {
+          return `
+            <div ${animate ? `style="animation-delay:${delay}ms;"` : ''} class="${animate ? 'anim-game-item' : ''} liquid-pill-static rounded-2xl p-2.5 flex items-center gap-3 text-left opacity-55 cursor-not-allowed">
+              <img src="${esc(g.img)}" data-appid="${g.appId}" onerror="handleCoverError(this)" alt="${esc(g.title)}" class="w-20 h-10 rounded-xl object-cover shrink-0 bg-[#121a27] grayscale-[35%]" />
+              <div class="min-w-0 flex-1">
+                <div class="text-xs font-bold truncate text-slate-300">${esc(g.title)}</div>
+                <div class="text-[11px] font-semibold text-[#d9ff00]/80">✓ Уже оценено</div>
+              </div>
+            </div>
+          `;
+        }
         return `
           <button type="button" data-pick-idx="${idx}" ${animate ? `style="animation-delay:${delay}ms;"` : ''} class="${animate ? 'anim-game-item' : ''} liquid-pill rounded-2xl bg-white/[0.05] hover:bg-white/[0.11] p-2.5 flex items-center gap-3 text-left cursor-pointer group">
             <img src="${esc(g.img)}" data-appid="${g.appId}" onerror="handleCoverError(this)" alt="${esc(g.title)}" class="w-20 h-10 rounded-xl object-cover shrink-0 bg-[#121a27] group-hover:scale-105 transition duration-200" />
@@ -1255,6 +1279,7 @@
       const seen = new Map();
       reviews.forEach(r => {
         if (Number(r.appId) === 0 && r.gameTitle) {
+          if (hasUserReviewedGame(0, r.gameTitle)) return;
           const key = r.gameTitle.trim().toLowerCase();
           if (!seen.has(key)) {
             seen.set(key, { appId: 0, title: r.gameTitle, img: r.gameImg || makeFallbackCover(r.gameTitle) });
@@ -1387,6 +1412,10 @@
         document.getElementById('custom-game-title').focus();
         return;
       }
+      if (hasUserReviewedGame(0, title)) {
+        showToast('Вы уже оценили эту игру — отредактируйте существующий обзор');
+        return;
+      }
       const cover = customCoverDataUrl || document.getElementById('custom-game-url').value.trim() || makeFallbackCover(title);
       openRateStep({ appId: 0, title, img: cover });
     };
@@ -1455,13 +1484,16 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
+        const respData = await r.json().catch(() => ({}));
         if (r.ok) {
-          reviews = (await r.json()).reviews;
+          reviews = respData.reviews;
           editingReviewId = null;
           document.getElementById('review-modal').classList.add('hidden');
           document.getElementById('input-review-text').value = '';
           renderApp();
           showToast(isEdit ? 'Обзор обновлён!' : 'Обзор опубликован!');
+        } else {
+          showToast(respData.error || 'Не удалось сохранить обзор');
         }
       } finally {
         pubBtn.disabled = false;
