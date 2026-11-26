@@ -16,7 +16,74 @@ function getBaseUrl(req) {
   return `${proto}://${host}`;
 }
 
-// ==================== SIGNED COOKIE AUTH (ZERO SESSION-STORE BUGS) ====================
+// ==================== STEAM API HELPERS WITH RETRY & XML FALLBACK ====================
+async function fetchWithRetry(url, attempts = 2) {
+  let lastStatus = 0;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const r = await fetch(url, {
+        headers: { 'User-Agent': 'AToQcritics/2.3 (+https://store.steampowered.com)' }
+      });
+      lastStatus = r.status;
+      if (r.ok) return { ok: true, status: r.status, response: r };
+      if (r.status === 403 || r.status === 401) return { ok: false, status: r.status, response: r };
+    } catch (err) {
+      lastStatus = 0;
+    }
+    if (i < attempts - 1) await new Promise(res => setTimeout(res, 700));
+  }
+  return { ok: false, status: lastStatus, response: null };
+}
+
+async function fetchSteamProfile(steamId) {
+  // 1. Try official Steam Web API GetPlayerSummaries
+  if (STEAM_API_KEY) {
+    const apiUrl = `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=${encodeURIComponent(STEAM_API_KEY)}&steamids=${encodeURIComponent(steamId)}`;
+    const res = await fetchWithRetry(apiUrl, 2);
+    if (res.ok) {
+      try {
+        const data = await res.response.json();
+        const p = data && data.response && data.response.players && data.response.players[0];
+        if (p && p.personaname) {
+          return {
+            found: true,
+            name: p.personaname,
+            avatar: p.avatarfull || p.avatarmedium || p.avatar || '',
+            profileUrl: p.profileurl || `https://steamcommunity.com/profiles/${steamId}`
+          };
+        }
+      } catch (e) {
+        console.warn('Steam summary JSON parse error:', e.message);
+      }
+    } else {
+      console.warn('Steam GetPlayerSummaries failed with status:', res.status);
+    }
+  }
+
+  // 2. Fallback to public Steam Community XML profile (works even if api.steampowered.com rate-limits)
+  const xmlRes = await fetchWithRetry(`https://steamcommunity.com/profiles/${encodeURIComponent(steamId)}/?xml=1`, 1);
+  if (xmlRes.ok) {
+    try {
+      const xml = await xmlRes.response.text();
+      const nameMatch = xml.match(/<steamID><!\[CDATA\[([\s\S]*?)\]\]><\/steamID>/i) || xml.match(/<steamID>([^<]+)<\/steamID>/i);
+      const avatarMatch = xml.match(/<avatarFull><!\[CDATA\[([\s\S]*?)\]\]><\/avatarFull>/i) || xml.match(/<avatarFull>([^<]+)<\/avatarFull>/i);
+      if (nameMatch && nameMatch[1].trim()) {
+        return {
+          found: true,
+          name: nameMatch[1].trim(),
+          avatar: avatarMatch ? avatarMatch[1].trim() : '',
+          profileUrl: `https://steamcommunity.com/profiles/${steamId}`
+        };
+      }
+    } catch (e) {
+      console.warn('Steam XML fallback parse error:', e.message);
+    }
+  }
+
+  return { found: false };
+}
+
+// ==================== SIGNED COOKIE AUTH ====================
 const COOKIE_NAME = 'atoq_steam_sid';
 
 function signSteamId(steamId) {
@@ -71,7 +138,7 @@ function clearAuthCookie(res) {
   res.setHeader('Set-Cookie', `${COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
 }
 
-// ==================== CLOUD POSTGRESQL (Supabase / Neon) ====================
+// ==================== CLOUD POSTGRESQL ====================
 const pool = new Pool({
   connectionString: DATABASE_URL,
   ssl: DATABASE_URL.includes('localhost') ? false : { rejectUnauthorized: false }
@@ -89,6 +156,12 @@ async function initDb() {
       avatar TEXT,
       profile_url TEXT,
       created_at BIGINT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS cached_libraries (
+      steam_id TEXT PRIMARY KEY REFERENCES users(steam_id) ON DELETE CASCADE,
+      games_json TEXT NOT NULL,
+      updated_at BIGINT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS reviews (
@@ -132,7 +205,6 @@ app.set('trust proxy', 1);
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Attach current user from signed cookie
 app.use(async (req, res, next) => {
   const cookies = parseCookies(req);
   const steamId = verifyCookieValue(cookies[COOKIE_NAME]);
@@ -169,7 +241,6 @@ app.get('/auth/steam', (req, res) => {
     'openid.identity': 'http://specs.openid.net/auth/2.0/identifier_select',
     'openid.claimed_id': 'http://specs.openid.net/auth/2.0/identifier_select'
   });
-  console.log('Steam OpenID redirect -> return_to:', `${baseUrl}/auth/steam/return`);
   res.redirect(`https://steamcommunity.com/openid/login?${params.toString()}`);
 });
 
@@ -194,7 +265,6 @@ app.get('/auth/steam/return', async (req, res) => {
     const verifyText = await verifyRes.text();
 
     if (!verifyText.includes('is_valid:true')) {
-      console.error('Steam OpenID verification failed:', verifyText);
       return res.redirect('/?auth_err=' + encodeURIComponent('Steam не подтвердил авторизацию. Попробуйте ещё раз.'));
     }
 
@@ -205,31 +275,26 @@ app.get('/auth/steam/return', async (req, res) => {
     }
     const steamId = match[1];
 
-    let name = `Steam_${steamId.slice(-6)}`;
-    let avatar = '';
-    let profileUrl = `https://steamcommunity.com/profiles/${steamId}`;
+    const prof = await fetchSteamProfile(steamId);
+    const fallbackName = `Steam_${steamId.slice(-6)}`;
+    const profileUrl = prof.found ? prof.profileUrl : `https://steamcommunity.com/profiles/${steamId}`;
 
-    try {
-      const sumRes = await fetch(`https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=${encodeURIComponent(STEAM_API_KEY)}&steamids=${encodeURIComponent(steamId)}`);
-      const sumData = await sumRes.json();
-      const player = sumData && sumData.response && sumData.response.players && sumData.response.players[0];
-      if (player) {
-        name = player.personaname || name;
-        avatar = player.avatarfull || player.avatarmedium || player.avatar || '';
-        profileUrl = player.profileurl || profileUrl;
-      }
-    } catch (e) {
-      console.warn('Could not fetch Steam player summary:', e.message);
-    }
-
+    // Never overwrite an existing real Steam nickname/avatar with fallback Steam_xxxxxx!
     await pool.query(`
       INSERT INTO users (steam_id, name, avatar, profile_url, created_at)
       VALUES ($1, $2, $3, $4, $5)
       ON CONFLICT (steam_id) DO UPDATE SET
-        name = EXCLUDED.name,
-        avatar = EXCLUDED.avatar,
-        profile_url = EXCLUDED.profile_url
-    `, [steamId, name, avatar, profileUrl, Date.now()]);
+        name = CASE WHEN $6 THEN EXCLUDED.name ELSE users.name END,
+        avatar = CASE WHEN $6 AND EXCLUDED.avatar <> '' THEN EXCLUDED.avatar ELSE users.avatar END,
+        profile_url = CASE WHEN $6 THEN EXCLUDED.profile_url ELSE users.profile_url END
+    `, [
+      steamId,
+      prof.found ? prof.name : fallbackName,
+      prof.found ? prof.avatar : '',
+      profileUrl,
+      Date.now(),
+      prof.found
+    ]);
 
     setAuthCookie(req, res, steamId);
     res.redirect('/');
@@ -244,7 +309,22 @@ app.post('/api/logout', (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/api/me', (req, res) => {
+app.get('/api/me', async (req, res) => {
+  // Auto-heal fallback Steam_xxxxxx nickname or missing avatar automatically
+  if (req.user && (/^Steam_\d+$/.test(req.user.name) || !req.user.avatar)) {
+    try {
+      const prof = await fetchSteamProfile(req.user.steam_id);
+      if (prof.found) {
+        const { rows } = await pool.query(
+          `UPDATE users SET name = $1, avatar = CASE WHEN $2 <> '' THEN $2 ELSE avatar END, profile_url = $3 WHERE steam_id = $4 RETURNING *`,
+          [prof.name, prof.avatar, prof.profileUrl, req.user.steam_id]
+        );
+        if (rows[0]) req.user = rows[0];
+      }
+    } catch (e) {
+      console.warn('Auto-heal profile failed:', e.message);
+    }
+  }
   res.json({ user: req.user || null });
 });
 
@@ -257,15 +337,36 @@ app.get('/api/users', requireAuth, async (req, res) => {
   }
 });
 
-// ==================== REAL STEAM LIBRARY & FULL CATALOG SEARCH ====================
+// ==================== REAL STEAM LIBRARY (WITH DB CACHE + RETRY) ====================
 app.get('/api/steam/library', requireAuth, async (req, res) => {
   if (!STEAM_API_KEY) {
     return res.status(500).json({ error: 'STEAM_API_KEY не настроен на сервере' });
   }
+
+  let cachedGames = [];
   try {
-    const url = `https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=${encodeURIComponent(STEAM_API_KEY)}&steamid=${encodeURIComponent(req.user.steam_id)}&include_appinfo=1&include_played_free_games=1`;
-    const r = await fetch(url);
-    const data = await r.json();
+    const c = await pool.query('SELECT games_json FROM cached_libraries WHERE steam_id = $1', [req.user.steam_id]);
+    if (c.rows[0]) cachedGames = JSON.parse(c.rows[0].games_json || '[]');
+  } catch {}
+
+  const url = `https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=${encodeURIComponent(STEAM_API_KEY)}&steamid=${encodeURIComponent(req.user.steam_id)}&include_appinfo=1&include_played_free_games=1`;
+  const apiRes = await fetchWithRetry(url, 2);
+
+  if (!apiRes.ok) {
+    console.warn('GetOwnedGames failed with status:', apiRes.status);
+    if (cachedGames.length > 0) {
+      return res.json({ games: cachedGames, isPrivate: false, fromCache: true });
+    }
+    const reason = apiRes.status === 403
+      ? 'Steam отклонил STEAM_API_KEY (ошибка 403). Проверьте ключ в настройках Render.'
+      : apiRes.status === 429
+        ? 'Steam временно ограничил запросы с IP хостинга (429). Нажмите «Обновить» через минуту.'
+        : `Steam API временно недоступен (код ${apiRes.status || 'сети'}). Попробуйте обновить чуть позже.`;
+    return res.json({ games: [], isPrivate: false, apiError: reason });
+  }
+
+  try {
+    const data = await apiRes.response.json();
     const rawGames = (data && data.response && data.response.games) || [];
     const games = rawGames
       .sort((a, b) => (b.playtime_forever || 0) - (a.playtime_forever || 0))
@@ -275,9 +376,26 @@ app.get('/api/steam/library', requireAuth, async (req, res) => {
         hoursPlayed: Math.round(((g.playtime_forever || 0) / 60) * 10) / 10,
         img: `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${g.appid}/header.jpg`
       }));
-    res.json({ games, isPrivate: rawGames.length === 0 });
+
+    if (games.length > 0) {
+      await pool.query(`
+        INSERT INTO cached_libraries (steam_id, games_json, updated_at)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (steam_id) DO UPDATE SET games_json = EXCLUDED.games_json, updated_at = EXCLUDED.updated_at
+      `, [req.user.steam_id, JSON.stringify(games), Date.now()]).catch(() => {});
+      return res.json({ games, isPrivate: false });
+    }
+
+    if (cachedGames.length > 0) {
+      return res.json({ games: cachedGames, isPrivate: false, fromCache: true });
+    }
+
+    return res.json({ games: [], isPrivate: true });
   } catch (err) {
-    res.status(502).json({ error: 'Не удалось загрузить библиотеку Steam' });
+    if (cachedGames.length > 0) {
+      return res.json({ games: cachedGames, isPrivate: false, fromCache: true });
+    }
+    return res.json({ games: [], isPrivate: false, apiError: 'Ошибка чтения ответа Steam API.' });
   }
 });
 
@@ -286,8 +404,9 @@ app.get('/api/steam/search', requireAuth, async (req, res) => {
   if (term.length < 2) return res.json({ games: [] });
   try {
     const url = `https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(term)}&l=russian&cc=KZ`;
-    const r = await fetch(url);
-    const data = await r.json();
+    const r = await fetchWithRetry(url, 2);
+    if (!r.ok) return res.status(502).json({ error: 'Ошибка поиска по каталогу Steam' });
+    const data = await r.response.json();
     const items = (data && data.items) || [];
     const games = items.map(item => ({
       appId: item.id,
