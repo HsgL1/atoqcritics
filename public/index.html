@@ -247,6 +247,7 @@
         <nav class="hidden sm:flex items-center gap-1.5">
           <button id="nav-home" type="button" class="liquid-pill px-4 py-2 rounded-full text-sm font-medium cursor-pointer">Главная</button>
           <button id="nav-feed" type="button" class="liquid-pill px-4 py-2 rounded-full text-sm font-medium cursor-pointer">Лента</button>
+          <button id="nav-games" type="button" class="liquid-pill px-4 py-2 rounded-full text-sm font-medium cursor-pointer">Игры</button>
           <button id="nav-profile" type="button" class="liquid-pill px-4 py-2 rounded-full text-sm font-medium cursor-pointer">Профиль</button>
         </nav>
         <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
@@ -260,18 +261,22 @@
       </div>
 
       <!-- Mobile Sticky Top Tabs -->
-      <nav class="pointer-events-auto sm:hidden max-w-6xl mx-auto liquid-glass rounded-full p-1 grid grid-cols-3 gap-1" aria-label="Мобильная навигация">
-        <button id="mnav-home" type="button" class="liquid-pill py-2 px-2 rounded-full text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer">
-          <i data-lucide="bar-chart-3" class="w-3.5 h-3.5"></i>
-          <span>Главная</span>
+      <nav class="pointer-events-auto sm:hidden max-w-6xl mx-auto liquid-glass rounded-full p-1 grid grid-cols-4 gap-1" aria-label="Мобильная навигация">
+        <button id="mnav-home" type="button" class="liquid-pill py-2 px-1 rounded-full text-[11px] font-semibold flex items-center justify-center gap-1 cursor-pointer">
+          <i data-lucide="bar-chart-3" class="w-3.5 h-3.5 shrink-0"></i>
+          <span class="truncate">Главная</span>
         </button>
-        <button id="mnav-feed" type="button" class="liquid-pill py-2 px-2 rounded-full text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer">
-          <i data-lucide="flame" class="w-3.5 h-3.5"></i>
-          <span>Лента</span>
+        <button id="mnav-feed" type="button" class="liquid-pill py-2 px-1 rounded-full text-[11px] font-semibold flex items-center justify-center gap-1 cursor-pointer">
+          <i data-lucide="flame" class="w-3.5 h-3.5 shrink-0"></i>
+          <span class="truncate">Лента</span>
         </button>
-        <button id="mnav-profile" type="button" class="liquid-pill py-2 px-2 rounded-full text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer">
-          <i data-lucide="user" class="w-3.5 h-3.5"></i>
-          <span>Профиль</span>
+        <button id="mnav-games" type="button" class="liquid-pill py-2 px-1 rounded-full text-[11px] font-semibold flex items-center justify-center gap-1 cursor-pointer">
+          <i data-lucide="gamepad-2" class="w-3.5 h-3.5 shrink-0"></i>
+          <span class="truncate">Игры</span>
+        </button>
+        <button id="mnav-profile" type="button" class="liquid-pill py-2 px-1 rounded-full text-[11px] font-semibold flex items-center justify-center gap-1 cursor-pointer">
+          <i data-lucide="user" class="w-3.5 h-3.5 shrink-0"></i>
+          <span class="truncate">Профиль</span>
         </button>
       </nav>
     </header>
@@ -383,6 +388,44 @@
           </select>
         </div>
         <div id="feed-list" class="space-y-4"></div>
+      </section>
+
+      <section id="view-games" class="hidden space-y-4 anim-view">
+        <div class="liquid-glass rounded-[26px] p-4 sm:p-5 space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#d9ff00]/15 text-[#d9ff00] border border-[#d9ff00]/35">Каталог сообщества</span>
+              <h2 class="text-xl sm:text-2xl font-bold mt-1">Все оценённые игры</h2>
+            </div>
+            <span id="games-count-badge" class="text-xs text-slate-400"></span>
+          </div>
+
+          <!-- Search & Sort -->
+          <div class="flex flex-col md:flex-row gap-2.5">
+            <div class="relative flex-1">
+              <input id="games-search" type="text" placeholder="Поиск игры по названию..." class="w-full pl-4 pr-10 py-2.5 rounded-full bg-white/[0.06] border border-white/12 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#66c0f4] transition" />
+              <button id="clear-games-search" type="button" title="Очистить поиск" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white/10 hover:bg-white/20 text-xs text-slate-300 hover:text-white flex items-center justify-center transition cursor-pointer">✕</button>
+            </div>
+            <select id="games-sort" class="px-4 py-2.5 rounded-full bg-[#141b29] border border-white/15 text-sm text-slate-200 cursor-pointer">
+              <option value="highest">Высокий балл</option>
+              <option value="lowest">Низкий балл</option>
+              <option value="most">Больше оценок</option>
+              <option value="newest">Недавно оценённые</option>
+              <option value="alpha">По алфавиту (А–Я)</option>
+            </select>
+          </div>
+
+          <!-- Category Filter Pills (Все / Шедевр / Отлично / Неплохо / Слабо) -->
+          <div id="games-cat-pills" class="flex flex-wrap items-center gap-1.5"></div>
+
+          <!-- Steam Tags Filter Strip -->
+          <div class="space-y-1.5">
+            <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Теги Steam</div>
+            <div id="games-tags-strip" class="flex flex-wrap items-center gap-1.5"></div>
+          </div>
+        </div>
+
+        <div id="games-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
       </section>
 
       <section id="view-profile" class="hidden space-y-5 anim-view">
@@ -527,6 +570,7 @@
 
     let currentUser = null, users = [], reviews = [], myLibrary = [], libraryPrivate = false, libraryError = '';
     let notifications = [], notifFilter = 'all', notifOpen = false;
+    let gamesCatFilter = 'all', gamesTagFilter = 'all';
     let activeView = 'home', profileUserId = null, searchTab = 'all', selectedGame = null, editingReviewId = null;
     let lastDisplayedGames = [];
     let modalScores = { gameplay: 16, visuals: 16, narrative: 16, audio: 16, emotions: 16 };
@@ -1173,8 +1217,8 @@
 
       const totalReviews = reviews.length;
       const totalUniqueGames = uniqueGames.length;
-      const globalAvg = totalReviews
-        ? Math.round(reviews.reduce((a, b) => a + (Number(b.total) || 0), 0) / totalReviews)
+      const globalAvg = totalUniqueGames
+        ? Math.round(uniqueGames.reduce((a, g) => a + g.avg, 0) / totalUniqueGames)
         : 0;
       const avgMeta = totalReviews ? scoreMeta(globalAvg) : { l: 'Нет оценок', bg: 'rgba(255,255,255,0.1)', c: '#94a3b8' };
 
@@ -1195,7 +1239,7 @@
           </div>
         </div>
         <div class="liquid-glass rounded-[24px] p-4 sm:p-5 flex flex-col justify-between gap-2">
-          <div class="text-xs font-medium text-slate-400">Средний балл сайта</div>
+          <div class="text-xs font-medium text-slate-400">Средняя оценка игры</div>
           <div class="flex items-end justify-between gap-2">
             <div class="text-3xl sm:text-4xl font-black tabular-nums leading-none" style="color:${totalReviews ? avgMeta.c : '#94a3b8'}">${totalReviews ? globalAvg : '—'}</div>
             <span class="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full ${totalReviews ? 'text-[#090c12]' : 'text-slate-400 bg-white/10'}" ${totalReviews ? `style="background:${avgMeta.bg};"` : ''}>${avgMeta.l}</span>
@@ -1230,24 +1274,28 @@
           .filter(c => c.count > 0)
           .map(c => {
             const pct = (c.count / totalUniqueGames) * 100;
-            return `<div title="${c.label}: ${c.count} (${Math.round(pct)}%)" class="h-full rounded-full transition-all duration-500" style="width:${pct}%; background:${c.bg};"></div>`;
+            return `<button type="button" data-jump-games-cat="${c.key}" title="${c.label}: ${c.count} (${Math.round(pct)}%) — открыть в каталоге" class="h-full rounded-full transition-all duration-500 hover:brightness-110 cursor-pointer" style="width:${pct}%; background:${c.bg};"></button>`;
           }).join('');
       }
 
       document.getElementById('home-category-grid').innerHTML = cats.map(c => {
         const pct = totalUniqueGames ? Math.round((c.count / totalUniqueGames) * 100) : 0;
         return `
-          <div class="relative overflow-hidden rounded-2xl bg-white/[0.04] border border-white/10 p-3.5 space-y-2">
-            <div class="absolute inset-y-0 left-0 transition-all duration-500" style="width:${pct}%; background:${c.fill};"></div>
+          <button
+            type="button"
+            data-jump-games-cat="${c.key}"
+            class="w-full text-left relative overflow-hidden rounded-2xl bg-white/[0.04] hover:bg-white/[0.09] border border-white/10 hover:border-white/25 p-3.5 space-y-2 transition hover:-translate-y-0.5 cursor-pointer group"
+          >
+            <div class="absolute inset-y-0 left-0 transition-all duration-500 pointer-events-none" style="width:${pct}%; background:${c.fill};"></div>
             <div class="relative z-10 flex items-center justify-between gap-2">
-              <span class="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold text-[#090c12]" style="background:${c.bg};">${c.label}</span>
+              <span class="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold text-[#090c12] shadow-sm group-hover:scale-105 transition" style="background:${c.bg};">${c.label}</span>
               <span class="text-[11px] text-slate-300 font-medium">${c.range}</span>
             </div>
             <div class="relative z-10 flex items-baseline justify-between pt-1">
               <span class="text-2xl font-black text-white tabular-nums">${c.count}</span>
-              <span class="text-xs font-semibold text-slate-300 tabular-nums">${pct}%</span>
+              <span class="text-xs font-semibold text-slate-300 group-hover:text-white transition tabular-nums">${pct}% →</span>
             </div>
-          </div>
+          </button>
         `;
       }).join('');
 
@@ -1332,9 +1380,185 @@
         : '<div class="text-xs text-slate-400 py-6 text-center">Пока нет пользователей</div>';
     }
 
+    function buildAggregatedGames() {
+      const map = new Map();
+      reviews.forEach(r => {
+        const key = r.appId > 0 ? `steam_${r.appId}` : `custom_${(r.gameTitle || '').trim().toLowerCase()}`;
+        if (!map.has(key)) {
+          map.set(key, {
+            key,
+            appId: r.appId,
+            title: r.gameTitle,
+            img: r.gameImg,
+            tags: new Set(),
+            reviews: [],
+            latestAt: 0
+          });
+        }
+        const g = map.get(key);
+        g.reviews.push(r);
+        if (!g.img && r.gameImg) g.img = r.gameImg;
+        if (r.createdAt > g.latestAt) g.latestAt = r.createdAt;
+        (r.gameTags || []).forEach(t => g.tags.add(t));
+      });
+      return Array.from(map.values()).map(g => {
+        const count = g.reviews.length;
+        const avg = Math.round(g.reviews.reduce((a, r) => a + (Number(r.total) || 0), 0) / count);
+        const cat = avg >= 90 ? 'master' : avg >= 75 ? 'great' : avg >= 55 ? 'ok' : 'weak';
+        return {
+          ...g,
+          tags: Array.from(g.tags),
+          count,
+          avg,
+          cat
+        };
+      });
+    }
+
+    function renderGamesCatalog(animateCards = false) {
+      const allGames = buildAggregatedGames();
+      const catDefs = [
+        { key: 'all', label: 'Все', count: allGames.length },
+        { key: 'master', label: 'Шедевр', count: allGames.filter(g => g.cat === 'master').length, dot: '#d9ff00' },
+        { key: 'great', label: 'Отлично', count: allGames.filter(g => g.cat === 'great').length, dot: '#38e8b0' },
+        { key: 'ok', label: 'Неплохо', count: allGames.filter(g => g.cat === 'ok').length, dot: '#fbbf24' },
+        { key: 'weak', label: 'Слабо', count: allGames.filter(g => g.cat === 'weak').length, dot: '#fb7185' }
+      ];
+
+      document.getElementById('games-cat-pills').innerHTML = catDefs.map(c => `
+        <button
+          type="button"
+          data-games-cat="${c.key}"
+          class="liquid-pill ${gamesCatFilter === c.key ? 'liquid-pill-active' : ''} px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+        >
+          ${c.dot ? `<span class="w-2 h-2 rounded-full" style="background:${c.dot};"></span>` : ''}
+          <span>${c.label}</span>
+          <span class="text-[11px] text-slate-400 tabular-nums">${c.count}</span>
+        </button>
+      `).join('');
+
+      // Collect all Steam tags sorted by frequency
+      const tagCounts = new Map();
+      allGames.forEach(g => g.tags.forEach(t => tagCounts.set(t, (tagCounts.get(t) || 0) + 1)));
+      const sortedTags = Array.from(tagCounts.entries()).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+
+      const tagsStrip = document.getElementById('games-tags-strip');
+      if (!sortedTags.length) {
+        tagsStrip.innerHTML = '<span class="text-xs text-slate-400">Теги Steam загружаются...</span>';
+      } else {
+        tagsStrip.innerHTML = [
+          `<button type="button" data-games-tag="all" class="liquid-pill ${gamesTagFilter === 'all' ? 'liquid-pill-active' : ''} px-3 py-1 rounded-full text-xs font-medium cursor-pointer">Все теги</button>`,
+          ...sortedTags.map(([tag, cnt]) => `
+            <button type="button" data-games-tag="${esc(tag)}" class="liquid-pill ${gamesTagFilter === tag ? 'liquid-pill-active' : ''} px-3 py-1 rounded-full text-xs font-medium cursor-pointer">
+              ${esc(tag)} <span class="text-[10px] text-slate-400 ml-0.5">${cnt}</span>
+            </button>
+          `)
+        ].join('');
+      }
+
+      // Filter & Sort
+      const q = (document.getElementById('games-search')?.value || '').trim().toLowerCase();
+      const sort = document.getElementById('games-sort')?.value || 'highest';
+      let list = allGames.filter(g => {
+        if (gamesCatFilter !== 'all' && g.cat !== gamesCatFilter) return false;
+        if (gamesTagFilter !== 'all' && !g.tags.includes(gamesTagFilter)) return false;
+        if (q && !g.title.toLowerCase().includes(q) && !g.tags.some(t => t.toLowerCase().includes(q))) return false;
+        return true;
+      });
+
+      if (sort === 'highest') list.sort((a, b) => b.avg - a.avg || b.count - a.count);
+      else if (sort === 'lowest') list.sort((a, b) => a.avg - b.avg || b.count - a.count);
+      else if (sort === 'most') list.sort((a, b) => b.count - a.count || b.avg - a.avg);
+      else if (sort === 'newest') list.sort((a, b) => b.latestAt - a.latestAt);
+      else if (sort === 'alpha') list.sort((a, b) => a.title.localeCompare(b.title));
+
+      document.getElementById('games-count-badge').textContent = `Показано: ${list.length} из ${allGames.length}`;
+
+      const grid = document.getElementById('games-grid');
+      if (!list.length) {
+        grid.innerHTML = '<div class="md:col-span-2 liquid-glass rounded-[26px] p-10 text-center text-sm text-slate-400">Игры по выбранным фильтрам не найдены.</div>';
+        return;
+      }
+
+      grid.innerHTML = list.map((g, idx) => {
+        const m = scoreMeta(g.avg);
+        const cover = g.img || (g.appId > 0 ? `/api/steam/cover/${g.appId}` : makeFallbackCover(g.title));
+        const alreadyMine = hasUserReviewedGame(g.appId, g.title);
+        const firstRevId = g.reviews[0].id;
+        const delay = Math.min(idx * 25, 220);
+
+        // Average score for each of the 4-5 criteria across critics
+        const critSummary = CRITERIA.map(c => {
+          const valid = g.reviews.filter(r => !(r.noNarrative && c.key === 'narrative'));
+          if (!valid.length) return '';
+          const avgPct = Math.round(valid.reduce((acc, r) => acc + ((Number(r.scores[c.key] || 0) / (r.noNarrative ? 25 : 20)) * 100), 0) / valid.length);
+          const fill = criterionFill(avgPct, 100);
+          return `
+            <div class="relative overflow-hidden rounded-full bg-white/[0.05] border border-white/[0.10] px-2.5 py-1">
+              <div class="absolute inset-y-0 left-0" style="width:${avgPct}%; background:${fill.bg};"></div>
+              <div class="relative z-10 flex items-center justify-between gap-1 text-[11px] font-semibold text-white tabular-nums">
+                <span class="truncate">${c.label}</span>
+                <span>${avgPct}%</span>
+              </div>
+            </div>
+          `;
+        }).filter(Boolean).join('');
+
+        return `
+          <article class="liquid-card ${animateCards ? 'anim-card' : ''} rounded-[24px] p-4 flex flex-col justify-between gap-3.5" ${animateCards ? `style="animation-delay:${delay}ms;"` : ''}>
+            <div class="space-y-3">
+              <div class="flex items-start gap-3">
+                <div class="w-28 sm:w-36 aspect-[460/215] rounded-2xl overflow-hidden border border-white/15 bg-[#121a27] shrink-0">
+                  <img src="${esc(cover)}" data-appid="${g.appId}" onerror="handleCoverError(this)" alt="${esc(g.title)}" class="w-full h-full object-cover" />
+                </div>
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-start justify-between gap-2">
+                    <div class="min-w-0">
+                      ${g.appId > 0
+                        ? `<a href="https://store.steampowered.com/app/${g.appId}/" target="_blank" rel="noopener" class="text-base sm:text-lg font-bold text-white hover:text-[#66c0f4] transition line-clamp-2 leading-tight">${esc(g.title)}</a>`
+                        : `<div class="text-base sm:text-lg font-bold text-white line-clamp-2 leading-tight">${esc(g.title)}</div>`
+                      }
+                      <div class="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                        <div class="flex -space-x-1.5">
+                          ${g.reviews.slice(0, 5).map(r => `<img src="${esc(r.authorAvatar || '/logo.jpg')}" title="${esc(r.authorName)}: ${r.total}" class="w-6 h-6 rounded-full object-cover border border-[#0e1420]" />`).join('')}
+                        </div>
+                        <span class="text-xs text-slate-400 font-medium">${g.count} ${g.count === 1 ? 'оценка' : (g.count < 5 ? 'оценки' : 'оценок')}</span>
+                      </div>
+                    </div>
+                    <div class="rounded-2xl min-w-[58px] px-2.5 py-2 text-center shrink-0" style="background:${m.bg}; box-shadow:${m.shadow};">
+                      <div class="text-2xl font-black leading-none text-[#090c12] tabular-nums">${g.avg}</div>
+                      <div class="text-[9px] font-extrabold uppercase text-[#090c12]/80 mt-0.5">${m.l}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              ${g.tags.length ? `
+                <div class="flex flex-wrap gap-1.5">
+                  ${g.tags.map(t => `<button type="button" data-games-tag="${esc(t)}" class="px-2.5 py-0.5 rounded-full text-[11px] bg-white/[0.06] hover:bg-white/[0.14] border border-white/10 text-slate-300 hover:text-white transition cursor-pointer">${esc(t)}</button>`).join('')}
+                </div>
+              ` : ''}
+
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                ${critSummary}
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between gap-2 pt-2.5 border-t border-white/[0.08]">
+              <button type="button" data-home-jump-game="${esc(g.title)}" class="liquid-pill px-3.5 py-1.5 rounded-full text-xs font-semibold text-slate-200 hover:text-white cursor-pointer">
+                Читать обзоры (${g.count})
+              </button>
+              ${!alreadyMine ? `<button type="button" data-rate-same-game="${esc(firstRevId)}" class="liquid-pill px-3.5 py-1.5 rounded-full text-xs font-semibold text-[#d9ff00] hover:border-[#d9ff00]/60 hover:bg-[#d9ff00]/10 cursor-pointer">+ Оценить</button>` : '<span class="text-[11px] font-semibold text-[#d9ff00]/80 px-2">✓ Оценено вами</span>'}
+            </div>
+          </article>
+        `;
+      }).join('');
+    }
+
     function saveCurrentRoute() {
       let hash = '#home';
       if (activeView === 'feed') hash = '#feed';
+      else if (activeView === 'games') hash = gamesCatFilter !== 'all' ? `#games/${gamesCatFilter}` : '#games';
       else if (activeView === 'profile') {
         hash = (profileUserId && currentUser && profileUserId !== currentUser.steam_id)
           ? `#profile/${encodeURIComponent(profileUserId)}`
@@ -1353,6 +1577,10 @@
       }
       if (hash === '#feed') {
         activeView = 'feed';
+      } else if (hash === '#games' || hash.startsWith('#games/')) {
+        activeView = 'games';
+        const cat = hash.startsWith('#games/') ? hash.slice('#games/'.length) : 'all';
+        gamesCatFilter = ['weak', 'ok', 'great', 'master'].includes(cat) ? cat : 'all';
       } else if (hash === '#profile') {
         activeView = 'profile';
         profileUserId = currentUser.steam_id;
@@ -1368,21 +1596,27 @@
       saveCurrentRoute();
       const isHome = activeView === 'home';
       const isFeed = activeView === 'feed';
+      const isGames = activeView === 'games';
       const isProfile = activeView === 'profile';
 
       document.getElementById('view-home').classList.toggle('hidden', !isHome);
       document.getElementById('view-feed').classList.toggle('hidden', !isFeed);
+      document.getElementById('view-games').classList.toggle('hidden', !isGames);
       document.getElementById('view-profile').classList.toggle('hidden', !isProfile);
 
       document.getElementById('nav-home').classList.toggle('liquid-pill-active', isHome);
       document.getElementById('nav-feed').classList.toggle('liquid-pill-active', isFeed);
+      document.getElementById('nav-games').classList.toggle('liquid-pill-active', isGames);
       document.getElementById('nav-profile').classList.toggle('liquid-pill-active', isProfile && profileUserId === currentUser.steam_id);
       document.getElementById('mnav-home').classList.toggle('liquid-pill-active', isHome);
       document.getElementById('mnav-feed').classList.toggle('liquid-pill-active', isFeed);
+      document.getElementById('mnav-games').classList.toggle('liquid-pill-active', isGames);
       document.getElementById('mnav-profile').classList.toggle('liquid-pill-active', isProfile && profileUserId === currentUser.steam_id);
 
       if (isHome) {
         renderHomeStats();
+      } else if (isGames) {
+        renderGamesCatalog(animateCards);
       } else if (isFeed) {
         document.getElementById('community-strip').innerHTML = users.map(u => `
           <button type="button" data-open-profile="${esc(u.steam_id)}" class="liquid-pill pl-1.5 pr-3 py-1 rounded-full flex items-center gap-2 shrink-0 cursor-pointer">
@@ -1578,6 +1812,7 @@
 
     document.getElementById('nav-brand').onclick = document.getElementById('nav-home').onclick = document.getElementById('mnav-home').onclick = () => { activeView = 'home'; openEmojiPickerId = null; renderApp(true); window.scrollTo({ top: 0, behavior: 'smooth' }); };
     document.getElementById('nav-feed').onclick = document.getElementById('mnav-feed').onclick = document.getElementById('btn-back-to-feed').onclick = () => { activeView = 'feed'; openEmojiPickerId = null; renderApp(true); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+    document.getElementById('nav-games').onclick = document.getElementById('mnav-games').onclick = () => { activeView = 'games'; openEmojiPickerId = null; renderApp(true); window.scrollTo({ top: 0, behavior: 'smooth' }); };
     document.getElementById('nav-profile').onclick = document.getElementById('mnav-profile').onclick = () => { activeView = 'profile'; profileUserId = currentUser.steam_id; openEmojiPickerId = null; renderApp(true); window.scrollTo({ top: 0, behavior: 'smooth' }); };
     document.getElementById('btn-logout').onclick = async () => { await fetch('/api/logout', { method: 'POST' }); location.reload(); };
     document.getElementById('btn-new-review').onclick = () => {
@@ -1903,6 +2138,29 @@
     });
 
     document.getElementById('app-shell').onclick = async e => {
+      const jcat = e.target.closest('[data-jump-games-cat]');
+      if (jcat) {
+        activeView = 'games';
+        gamesCatFilter = jcat.dataset.jumpGamesCat || 'all';
+        gamesTagFilter = 'all';
+        renderApp(true);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+      const gcat = e.target.closest('[data-games-cat]');
+      if (gcat) {
+        gamesCatFilter = gcat.dataset.gamesCat || 'all';
+        saveCurrentRoute();
+        renderGamesCatalog(false);
+        return;
+      }
+      const gtag = e.target.closest('[data-games-tag]');
+      if (gtag) {
+        const nextTag = gtag.dataset.gamesTag || 'all';
+        gamesTagFilter = gamesTagFilter === nextTag && nextTag !== 'all' ? 'all' : nextTag;
+        renderGamesCatalog(false);
+        return;
+      }
       const jg = e.target.closest('[data-home-jump-game]');
       if (jg) {
         activeView = 'feed';
@@ -2224,6 +2482,10 @@
     bindClearSearch('feed-search', 'clear-feed-search', () => renderFeedListOnly());
     bindClearSearch('profile-search', 'clear-profile-search', () => renderProfileListOnly(false));
     bindClearSearch('steam-game-search', 'clear-steam-search', () => renderSearchResults(false));
+    bindClearSearch('games-search', 'clear-games-search', () => renderGamesCatalog(false));
+    let gamesSearchTimer = null;
+    document.getElementById('games-search').oninput = () => { clearTimeout(gamesSearchTimer); gamesSearchTimer = setTimeout(() => renderGamesCatalog(false), 120); };
+    document.getElementById('games-sort').onchange = () => renderGamesCatalog(false);
 
     document.getElementById('btn-notifications').onclick = e => {
       e.stopPropagation();
