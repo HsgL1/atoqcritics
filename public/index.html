@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
   <title>AToQcritics — Оценки игр из библиотеки Steam</title>
   <link rel="shortcut icon" href="/favicon.ico?v=2" />
   <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2" />
@@ -20,7 +20,7 @@
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
   <style>
-    :root { --bg-obsidian: #090c12; --accent-lime: #d9ff00; --accent-steam: #66c0f4; }
+    :root { --bg-obsidian: #090c12; --accent-lime: #d9ff00; --accent-steam: #66c0f4; --kb-height: 0px; --vv-height: 100dvh; }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body { margin: 0; font-family: 'Inter', sans-serif; background: var(--bg-obsidian); color: #f1f5f9; min-height: 100vh; overflow-x: clip; overscroll-behavior-x: none; }
     .ambient-bg {
@@ -180,7 +180,18 @@
 
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    #app-shell main {
+      padding-bottom: calc(3.5rem + var(--kb-height, 0px));
+      transition: padding-bottom 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    #review-modal, #meta-modal {
+      padding-bottom: var(--kb-height, 0px);
+      transition: padding-bottom 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+    }
     @media (max-width: 639px) {
+      #review-modal > div, #meta-modal > div {
+        max-height: calc(var(--vv-height, 100dvh) - 12px);
+      }
       input, textarea, select { font-size: 16px !important; }
       .liquid-card:hover { transform: none; }
       .liquid-glass, .liquid-card {
@@ -3014,7 +3025,54 @@
       deferredInstallPrompt = e;
     });
 
-    if ('serviceWorker' in navigator) {
+    // Telegram-style keyboard lift using VisualViewport API (iOS Safari, Android Chrome & PWA)
+    (function setupMobileKeyboardLift() {
+      const root = document.documentElement;
+      let scrollTimer = null;
+
+      function syncViewport() {
+        const vv = window.visualViewport;
+        if (!vv) return;
+        const kb = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+        root.style.setProperty('--kb-height', `${kb}px`);
+        root.style.setProperty('--vv-height', `${Math.round(vv.height)}px`);
+
+        if (kb > 80) {
+          const active = document.activeElement;
+          if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
+            clearTimeout(scrollTimer);
+            scrollTimer = setTimeout(() => {
+              try {
+                active.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              } catch {}
+            }, 90);
+          }
+        }
+      }
+
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', syncViewport);
+        window.visualViewport.addEventListener('scroll', syncViewport);
+        syncViewport();
+      }
+
+      document.addEventListener('focusin', e => {
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
+          setTimeout(() => {
+            syncViewport();
+            if (isTouchDevice()) {
+              try { e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch {}
+            }
+          }, 160);
+        }
+      });
+
+      document.addEventListener('focusout', () => {
+        setTimeout(syncViewport, 120);
+      });
+    })();
+
+        if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js').catch(() => {});
       });
