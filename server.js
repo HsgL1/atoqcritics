@@ -102,37 +102,71 @@ async function fetchSteamAchievements(steamId, appId) {
   }
 }
 
-async function fetchSteamGameTags(appId) {
-  if (!appId || appId <= 0) return [];
+async function fetchSteamGameMetadata(appId) {
+  if (!appId || appId <= 0) return { genres: [], userTags: [] };
+  const genres = [];
+  const userTags = [];
+  const seenG = new Set();
+  const seenT = new Set();
+
+  // 1. Official Steam Russian Genres from appdetails
   try {
     const url = `https://store.steampowered.com/api/appdetails?appids=${encodeURIComponent(appId)}&l=russian`;
     const res = await fetchWithRetry(url, 2);
-    if (!res.ok) return [];
-    const data = await res.response.json();
-    const entry = data && data[String(appId)];
-    if (!entry || !entry.success || !entry.data) return [];
-    const tags = [];
-    const seen = new Set();
-    const addTag = t => {
-      const clean = String(t || '').trim();
-      if (clean && !seen.has(clean.toLowerCase())) {
-        seen.add(clean.toLowerCase());
-        tags.push(clean);
+    if (res.ok) {
+      const data = await res.response.json();
+      const entry = data && data[String(appId)];
+      if (entry && entry.success && entry.data && Array.isArray(entry.data.genres)) {
+        entry.data.genres.forEach(g => {
+          const clean = String(g.description || '').trim();
+          if (clean && !seenG.has(clean.toLowerCase())) {
+            seenG.add(clean.toLowerCase());
+            genres.push(clean);
+          }
+        });
       }
-    };
-    if (Array.isArray(entry.data.genres)) {
-      entry.data.genres.forEach(g => addTag(g.description));
     }
-    const usefulCatIds = new Set([1, 2, 9, 36, 38, 49]); // Multiplayer, Singleplayer, Co-op, Online PvP, Online Co-op, PvP
-    if (Array.isArray(entry.data.categories)) {
-      entry.data.categories.forEach(c => {
-        if (usefulCatIds.has(Number(c.id))) addTag(c.description);
-      });
+  } catch {}
+
+  // 2. Real Steam Community User Tags ("Метки": Похожа на Dark Souls, Открытый мир, Глубокий сюжет, etc.)
+  try {
+    const storeRes = await fetch(`https://store.steampowered.com/app/${encodeURIComponent(appId)}/?l=russian`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+        'Accept-Language': 'ru-RU,ru;q=0.9',
+        'Cookie': 'birthtime=568022401; lastagecheckage=1-January-1988; wants_mature_content=1'
+      }
+    });
+    if (storeRes.ok) {
+      const html = await storeRes.text();
+      const modalMatch = html.match(/InitAppTagModal\(\s*\d+\s*,\s*(\[[\s\S]*?\])\s*,/);
+      if (modalMatch && modalMatch[1]) {
+        try {
+          const parsed = JSON.parse(modalMatch[1]);
+          parsed.forEach(item => {
+            const clean = String(item && item.name || '').trim();
+            if (clean && !seenT.has(clean.toLowerCase()) && !seenG.has(clean.toLowerCase())) {
+              seenT.add(clean.toLowerCase());
+              userTags.push(clean);
+            }
+          });
+        } catch {}
+      }
+      if (!userTags.length) {
+        const tagRegex = /class="app_tag"[^>]*>([^<]+)<\/a>/gi;
+        let m;
+        while ((m = tagRegex.exec(html)) !== null) {
+          const clean = String(m[1] || '').trim();
+          if (clean && clean !== '+' && !seenT.has(clean.toLowerCase()) && !seenG.has(clean.toLowerCase())) {
+            seenT.add(clean.toLowerCase());
+            userTags.push(clean);
+          }
+        }
+      }
     }
-    return tags.slice(0, 6);
-  } catch {
-    return [];
-  }
+  } catch {}
+
+  return { genres: genres.slice(0, 6), userTags: userTags.slice(0, 10) };
 }
 
 // ==================== SIGNED COOKIE AUTH ====================
@@ -272,6 +306,13 @@ async function initDb() {
       tags_json TEXT NOT NULL,
       updated_at BIGINT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS custom_game_meta (
+      game_key TEXT PRIMARY KEY,
+      genres_json TEXT NOT NULL DEFAULT '[]',
+      tags_json TEXT NOT NULL DEFAULT '[]',
+      updated_at BIGINT NOT NULL
+    );
   `);
   await pool.query(`
     ALTER TABLE reviews ADD COLUMN IF NOT EXISTS ach_unlocked INTEGER;
@@ -280,6 +321,8 @@ async function initDb() {
     ALTER TABLE comments ADD COLUMN IF NOT EXISTS reply_to_id TEXT;
     ALTER TABLE comments ADD COLUMN IF NOT EXISTS reply_to_author TEXT;
     ALTER TABLE comments ADD COLUMN IF NOT EXISTS reply_to_text TEXT;
+    ALTER TABLE game_tags ADD COLUMN IF NOT EXISTS genres_json TEXT;
+    ALTER TABLE game_tags ADD COLUMN IF NOT EXISTS user_tags_json TEXT;
   `);
   console.log('Облачная база PostgreSQL подключена и таблицы готовы.');
   // Backfill achievements for existing reviews in background
@@ -299,20 +342,30 @@ async function backfillAchievements() {
 }
 
 async function ensureGameTags(appId) {
-  if (!appId || appId <= 0) return [];
+  if (!appId || appId <= 0) return { genres: [], userTags: [] };
   try {
-    const existing = await pool.query('SELECT tags_json FROM game_tags WHERE app_id = $1', [appId]);
-    if (existing.rows[0]) return JSON.parse(existing.rows[0].tags_json || '[]');
-    const tags = await fetchSteamGameTags(appId);
-    if (tags.length > 0) {
-      await pool.query(
-        'INSERT INTO game_tags (app_id, tags_json, updated_at) VALUES ($1, $2, $3) ON CONFLICT (app_id) DO UPDATE SET tags_json = EXCLUDED.tags_json, updated_at = EXCLUDED.updated_at',
-        [appId, JSON.stringify(tags), Date.now()]
-      );
+    const existing = await pool.query('SELECT genres_json, user_tags_json FROM game_tags WHERE app_id = $1', [appId]);
+    if (existing.rows[0] && existing.rows[0].user_tags_json !== null && existing.rows[0].genres_json !== null) {
+      return {
+        genres: JSON.parse(existing.rows[0].genres_json || '[]'),
+        userTags: JSON.parse(existing.rows[0].user_tags_json || '[]')
+      };
     }
-    return tags;
+    const meta = await fetchSteamGameMetadata(appId);
+    if (meta.genres.length > 0 || meta.userTags.length > 0) {
+      await pool.query(`
+        INSERT INTO game_tags (app_id, tags_json, genres_json, user_tags_json, updated_at)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (app_id) DO UPDATE SET
+          tags_json = EXCLUDED.tags_json,
+          genres_json = EXCLUDED.genres_json,
+          user_tags_json = EXCLUDED.user_tags_json,
+          updated_at = EXCLUDED.updated_at
+      `, [appId, JSON.stringify(meta.genres), JSON.stringify(meta.genres), JSON.stringify(meta.userTags), Date.now()]);
+    }
+    return meta;
   } catch {
-    return [];
+    return { genres: [], userTags: [] };
   }
 }
 
@@ -321,12 +374,12 @@ async function backfillGameTags() {
     SELECT DISTINCT r.app_id
     FROM reviews r
     LEFT JOIN game_tags gt ON gt.app_id = r.app_id
-    WHERE r.app_id > 0 AND gt.app_id IS NULL
-    LIMIT 100
+    WHERE r.app_id > 0 AND (gt.app_id IS NULL OR gt.user_tags_json IS NULL)
+    LIMIT 120
   `);
   for (const row of rows) {
     await ensureGameTags(row.app_id);
-    await new Promise(res => setTimeout(res, 380));
+    await new Promise(res => setTimeout(res, 450));
   }
 }
 
@@ -579,9 +632,9 @@ app.get('/api/steam/search', requireAuth, async (req, res) => {
 
 // ==================== REVIEWS, VOTES & COMMENTS ====================
 async function hydrateReviews() {
-  const [revRes, voteRes, commRes, reactRes] = await Promise.all([
+  const [revRes, voteRes, commRes, reactRes, customMetaRes] = await Promise.all([
     pool.query(`
-      SELECT r.*, u.name AS author_name, u.avatar AS author_avatar, u.profile_url AS author_url, gt.tags_json AS game_tags_json
+      SELECT r.*, u.name AS author_name, u.avatar AS author_avatar, u.profile_url AS author_url, gt.tags_json AS game_tags_json, gt.genres_json AS game_genres_json, gt.user_tags_json AS game_user_tags_json
       FROM reviews r
       JOIN users u ON u.steam_id = r.user_steam_id
       LEFT JOIN game_tags gt ON gt.app_id = r.app_id
@@ -594,8 +647,32 @@ async function hydrateReviews() {
       JOIN users u ON u.steam_id = c.user_steam_id
       ORDER BY c.created_at ASC
     `),
-    pool.query('SELECT * FROM reactions')
+    pool.query('SELECT * FROM reactions'),
+    pool.query('SELECT * FROM custom_game_meta')
   ]);
+
+  const customMetaMap = {};
+  customMetaRes.rows.forEach(cm => {
+    try {
+      customMetaMap[cm.game_key] = {
+        genres: JSON.parse(cm.genres_json || '[]'),
+        tags: JSON.parse(cm.tags_json || '[]')
+      };
+    } catch {}
+  });
+
+  const mergeUnique = (a, b) => {
+    const out = [];
+    const seen = new Set();
+    [...(a || []), ...(b || [])].forEach(item => {
+      const clean = String(item || '').trim();
+      if (clean && !seen.has(clean.toLowerCase())) {
+        seen.add(clean.toLowerCase());
+        out.push(clean);
+      }
+    });
+    return out;
+  };
 
   const likesMap = {};
   const dislikesMap = {};
@@ -625,7 +702,16 @@ async function hydrateReviews() {
     (bucket[rx.emoji] ||= []).push(rx.user_steam_id);
   });
 
-  return revRes.rows.map(r => ({
+  return revRes.rows.map(r => {
+    const gKey = r.app_id > 0 ? `steam_${r.app_id}` : `custom_${String(r.game_title || '').trim().toLowerCase()}`;
+    const cMeta = customMetaMap[gKey] || { genres: [], tags: [] };
+    const baseGenres = r.app_id > 0
+      ? (r.game_genres_json ? JSON.parse(r.game_genres_json) : (r.game_tags_json ? JSON.parse(r.game_tags_json) : []))
+      : ['Сторонняя игра'];
+    const baseTags = r.app_id > 0
+      ? (r.game_user_tags_json ? JSON.parse(r.game_user_tags_json) : [])
+      : [];
+    return {
     id: r.id,
     userId: r.user_steam_id,
     authorName: r.author_name,
@@ -633,7 +719,10 @@ async function hydrateReviews() {
     appId: r.app_id,
     gameTitle: r.game_title,
     gameImg: r.game_img,
-    gameTags: r.app_id > 0 ? (r.game_tags_json ? JSON.parse(r.game_tags_json) : []) : ['Сторонняя игра'],
+    gameGenres: mergeUnique(baseGenres, cMeta.genres),
+    gameTags: mergeUnique(baseTags, cMeta.tags),
+    customGenres: cMeta.genres,
+    customTags: cMeta.tags,
     scores: {
       gameplay: r.gameplay,
       visuals: r.visuals,
@@ -652,7 +741,8 @@ async function hydrateReviews() {
     dislikes: dislikesMap[r.id] || [],
     comments: commentsMap[r.id] || [],
     reactions: reactionsMap[r.id] || {}
-  }));
+    };
+  });
 }
 
 app.get('/api/reviews', requireAuth, async (req, res) => {
@@ -970,6 +1060,44 @@ app.delete('/api/notifications', requireAuth, async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: 'Ошибка очистки уведомлений' });
+  }
+});
+
+app.post('/api/games/meta', requireAuth, async (req, res) => {
+  try {
+    const { appId, gameTitle, genres, tags } = req.body || {};
+    const numAppId = Number(appId) || 0;
+    const cleanTitle = String(gameTitle || '').trim();
+    if (numAppId <= 0 && !cleanTitle) {
+      return res.status(400).json({ error: 'Не указана игра' });
+    }
+    const gKey = numAppId > 0 ? `steam_${numAppId}` : `custom_${cleanTitle.toLowerCase()}`;
+    const cleanList = (arr, limit) => {
+      const out = [];
+      const seen = new Set();
+      (Array.isArray(arr) ? arr : []).forEach(v => {
+        const t = String(v || '').trim().slice(0, 40);
+        if (t && !seen.has(t.toLowerCase()) && out.length < limit) {
+          seen.add(t.toLowerCase());
+          out.push(t);
+        }
+      });
+      return out;
+    };
+    const finalGenres = cleanList(genres, 8);
+    const finalTags = cleanList(tags, 15);
+    await pool.query(`
+      INSERT INTO custom_game_meta (game_key, genres_json, tags_json, updated_at)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (game_key) DO UPDATE SET
+        genres_json = EXCLUDED.genres_json,
+        tags_json = EXCLUDED.tags_json,
+        updated_at = EXCLUDED.updated_at
+    `, [gKey, JSON.stringify(finalGenres), JSON.stringify(finalTags), Date.now()]);
+
+    res.json({ ok: true, reviews: await hydrateReviews() });
+  } catch (err) {
+    res.status(500).json({ error: 'Ошибка сохранения жанров и меток' });
   }
 });
 
