@@ -623,19 +623,13 @@
         <!-- TAB 1: REVIEWS -->
         <div id="profile-tab-reviews" class="space-y-5 anim-view">
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div class="liquid-glass rounded-[26px] p-5">
-              <button type="button" data-open-games-top="best" class="w-full flex items-center justify-between gap-2 mb-3 group cursor-pointer text-left">
-                <h3 class="text-base font-bold text-[#d9ff00] group-hover:underline">Топ лучших игр</h3>
-                <span class="text-[11px] font-semibold text-slate-400 group-hover:text-[#d9ff00] transition flex items-center gap-1">Весь топ <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></span>
-              </button>
-              <div id="profile-top-best" class="space-y-2.5"></div>
+            <div class="liquid-glass rounded-[26px] p-4 sm:p-5">
+              <h3 class="text-base font-bold text-[#d9ff00] mb-3">Топ-5 лучших игр</h3>
+              <div id="profile-top-best" class="space-y-2"></div>
             </div>
-            <div class="liquid-glass rounded-[26px] p-5">
-              <button type="button" data-open-games-top="worst" class="w-full flex items-center justify-between gap-2 mb-3 group cursor-pointer text-left">
-                <h3 class="text-base font-bold text-rose-400 group-hover:underline">Топ худших игр</h3>
-                <span class="text-[11px] font-semibold text-slate-400 group-hover:text-rose-400 transition flex items-center gap-1">Весь топ <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></span>
-              </button>
-              <div id="profile-top-worst" class="space-y-2.5"></div>
+            <div class="liquid-glass rounded-[26px] p-4 sm:p-5">
+              <h3 class="text-base font-bold text-rose-400 mb-3">Топ-5 худших игр</h3>
+              <div id="profile-top-worst" class="space-y-2"></div>
             </div>
           </div>
           <div class="liquid-glass rounded-[24px] p-3.5 flex flex-col md:flex-row gap-3">
@@ -2233,8 +2227,8 @@
           const m = scoreMeta(r.total);
           return `<div class="rounded-2xl bg-white/[0.04] hover:bg-white/[0.08] transition p-2.5 flex items-center gap-3"><span class="text-xs font-bold text-slate-400 w-5">#${i+1}</span><img src="${esc(r.gameImg || (r.appId > 0 ? `/api/steam/cover/${r.appId}` : makeFallbackCover(r.gameTitle)))}" data-appid="${r.appId}" onerror="handleCoverError(this)" alt="${esc(r.gameTitle)}" class="w-16 h-9 rounded-lg object-cover bg-[#121a27] shrink-0" /><span class="flex-1 text-sm font-semibold truncate">${esc(r.gameTitle)}</span><span class="px-2.5 py-1 rounded-xl font-black text-xs text-[#090c12] shrink-0" style="background:${m.bg};">${r.total}</span></div>`;
         };
-        const best = [...uRevs].sort((a,b) => b.total - a.total).slice(0,3);
-        const worst = [...uRevs].sort((a,b) => a.total - b.total).slice(0,3);
+        const best = [...uRevs].sort((a,b) => b.total - a.total).slice(0,5);
+        const worst = [...uRevs].sort((a,b) => a.total - b.total).slice(0,5);
         document.getElementById('profile-top-best').innerHTML = best.length ? best.map(row).join('') : '<div class="text-xs text-slate-400">Пока нет оценённых игр</div>';
         document.getElementById('profile-top-worst').innerHTML = worst.length ? worst.map(row).join('') : '<div class="text-xs text-slate-400">Пока нет оценённых игр</div>';
         renderProfileSubTabs(u, uRevs, animateCards);
