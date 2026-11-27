@@ -145,6 +145,16 @@
       from { opacity: 0; transform: translateY(22px) scale(0.95); }
       to { opacity: 1; transform: translateY(0) scale(1); }
     }
+    @keyframes modalBackdropOut {
+      from { opacity: 1; }
+      to { opacity: 0; }
+    }
+    @keyframes modalPanelOut {
+      from { opacity: 1; transform: translateY(0) scale(1); }
+      to { opacity: 0; transform: translateY(18px) scale(0.95); }
+    }
+    .anim-modal-bg-out { animation: modalBackdropOut 0.19s ease forwards !important; }
+    .anim-modal-panel-out { animation: modalPanelOut 0.19s cubic-bezier(0.4, 0, 1, 1) forwards !important; }
     @keyframes stepSlideInRight {
       from { opacity: 0; transform: translateX(22px); }
       to { opacity: 1; transform: translateX(0); }
@@ -744,7 +754,14 @@
     let lockedScrollY = 0;
     let isScrollLocked = false;
 
+    let modalCloseTimer = null;
+
     function openModal() {
+      clearTimeout(modalCloseTimer);
+      const modal = document.getElementById('review-modal');
+      const panel = modal.firstElementChild;
+      modal.classList.remove('hidden', 'anim-modal-bg-out');
+      if (panel) panel.classList.remove('anim-modal-panel-out');
       if (!isScrollLocked) {
         lockedScrollY = window.scrollY || window.pageYOffset || 0;
         isScrollLocked = true;
@@ -756,22 +773,31 @@
         document.body.style.right = '0';
         document.body.style.width = '100%';
       }
-      document.getElementById('review-modal').classList.remove('hidden');
     }
 
     function closeModal() {
-      document.getElementById('review-modal').classList.add('hidden');
-      if (isScrollLocked) {
-        isScrollLocked = false;
-        document.documentElement.style.overflow = '';
-        document.body.style.overflow = '';
-        document.body.style.position = '';
-        document.body.style.top = '';
-        document.body.style.left = '';
-        document.body.style.right = '';
-        document.body.style.width = '';
-        window.scrollTo(0, lockedScrollY);
-      }
+      const modal = document.getElementById('review-modal');
+      if (modal.classList.contains('hidden')) return;
+      const panel = modal.firstElementChild;
+      modal.classList.add('anim-modal-bg-out');
+      if (panel) panel.classList.add('anim-modal-panel-out');
+      clearTimeout(modalCloseTimer);
+      modalCloseTimer = setTimeout(() => {
+        modal.classList.add('hidden');
+        modal.classList.remove('anim-modal-bg-out');
+        if (panel) panel.classList.remove('anim-modal-panel-out');
+        if (isScrollLocked) {
+          isScrollLocked = false;
+          document.documentElement.style.overflow = '';
+          document.body.style.overflow = '';
+          document.body.style.position = '';
+          document.body.style.top = '';
+          document.body.style.left = '';
+          document.body.style.right = '';
+          document.body.style.width = '';
+          window.scrollTo(0, lockedScrollY);
+        }
+      }, 190);
     }
 
     function showToast(msg) {
@@ -2325,69 +2351,111 @@
       document.getElementById('cv-' + key).textContent = `${Math.round(rawVal)} / ${maxVal}`;
       updateScore();
     };
-    document.getElementById('review-form').onsubmit = async e => {
+    document.getElementById('review-form').onsubmit = e => {
       e.preventDefault();
-      const pubBtn = document.getElementById('btn-publish-review');
-      pubBtn.disabled = true;
+      if (!selectedGame) return;
       const isEdit = Boolean(editingReviewId);
-      pubBtn.textContent = isEdit ? 'Сохранение...' : 'Публикация...';
-      try {
-        const roundedScores = {};
-        CRITERIA.forEach(c => { roundedScores[c.key] = Math.round(Number(modalScores[c.key])); });
-        const url = isEdit ? `/api/reviews/${editingReviewId}` : '/api/reviews';
-        const method = isEdit ? 'PUT' : 'POST';
-        const payload = isEdit
-          ? {
-              scores: roundedScores,
-              noNarrative: modalNoNarrative,
-              hoursPlayed: document.getElementById('input-hours').value,
-              text: document.getElementById('input-review-text').value
-            }
-          : {
-              appId: selectedGame.appId,
-              gameTitle: selectedGame.title,
-              gameImg: selectedGame.img,
-              scores: roundedScores,
-              noNarrative: modalNoNarrative,
-              hoursPlayed: document.getElementById('input-hours').value,
-              text: document.getElementById('input-review-text').value
-            };
-        const r = await fetch(url, {
-          method,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const respData = await r.json().catch(() => ({}));
-        if (r.ok) {
-          if (!isEdit && selectedGame && ((selectedGame.initGenres && selectedGame.initGenres.length) || (selectedGame.initTags && selectedGame.initTags.length))) {
-            const mr = await fetch('/api/games/meta', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                appId: selectedGame.appId,
-                gameTitle: selectedGame.title,
-                genres: selectedGame.initGenres || [],
-                tags: selectedGame.initTags || []
-              })
-            }).catch(() => null);
-            if (mr && mr.ok) {
-              const md = await mr.json();
-              if (md && md.reviews) respData.reviews = md.reviews;
-            }
-          }
-          reviews = respData.reviews;
-          editingReviewId = null;
-          closeModal();
-          document.getElementById('input-review-text').value = '';
-          renderApp();
-          showToast(isEdit ? 'Обзор обновлён!' : 'Обзор опубликован!');
-        } else {
-          showToast(respData.error || 'Не удалось сохранить обзор');
+      const editId = editingReviewId;
+      const gameSnapshot = { ...selectedGame };
+      const noNarSnapshot = modalNoNarrative;
+      const hoursVal = document.getElementById('input-hours').value;
+      const textVal = document.getElementById('input-review-text').value.trim();
+
+      const roundedScores = {};
+      CRITERIA.forEach(c => {
+        roundedScores[c.key] = (noNarSnapshot && c.key === 'narrative') ? 0 : Math.round(Number(modalScores[c.key]));
+      });
+      const totalScore = CRITERIA.reduce((acc, c) => acc + (noNarSnapshot && c.key === 'narrative' ? 0 : roundedScores[c.key]), 0);
+      const numHours = hoursVal !== '' && !Number.isNaN(Number(hoursVal)) ? Number(hoursVal) : null;
+
+      // Optimistic instant update + immediate smooth exit animation (0 ms delay!)
+      const prevReviewsBackup = [...reviews];
+      if (isEdit) {
+        const existing = reviews.find(x => x.id === editId);
+        if (existing) {
+          existing.scores = { ...roundedScores };
+          existing.total = totalScore;
+          existing.noNarrative = noNarSnapshot;
+          existing.hoursPlayed = numHours;
+          existing.text = textVal;
         }
-      } finally {
-        pubBtn.disabled = false;
-        pubBtn.textContent = editingReviewId ? 'Сохранить изменения' : 'Опубликовать';
+      } else {
+        reviews.unshift({
+          id: 'rev_tmp_' + Date.now(),
+          userId: currentUser.steam_id,
+          authorName: currentUser.name,
+          authorAvatar: currentUser.avatar || '/logo.jpg',
+          appId: gameSnapshot.appId,
+          gameTitle: gameSnapshot.title,
+          gameImg: gameSnapshot.img,
+          gameGenres: gameSnapshot.appId === 0 ? ['Сторонняя игра', ...(gameSnapshot.initGenres || [])] : [],
+          gameTags: gameSnapshot.initTags || [],
+          customGenres: gameSnapshot.initGenres || [],
+          customTags: gameSnapshot.initTags || [],
+          scores: { ...roundedScores },
+          total: totalScore,
+          noNarrative: noNarSnapshot,
+          hoursPlayed: numHours,
+          achUnlocked: null,
+          achTotal: null,
+          text: textVal,
+          createdAt: Date.now(),
+          likes: [],
+          dislikes: [],
+          comments: [],
+          reactions: {}
+        });
       }
+
+      editingReviewId = null;
+      document.getElementById('input-review-text').value = '';
+      closeModal();
+      renderApp(false);
+      showToast(isEdit ? 'Обзор обновлён!' : 'Обзор опубликован!');
+
+      const url = isEdit ? `/api/reviews/${editId}` : '/api/reviews';
+      const method = isEdit ? 'PUT' : 'POST';
+      const payload = isEdit
+        ? { scores: roundedScores, noNarrative: noNarSnapshot, hoursPlayed: hoursVal, text: textVal }
+        : { appId: gameSnapshot.appId, gameTitle: gameSnapshot.title, gameImg: gameSnapshot.img, scores: roundedScores, noNarrative: noNarSnapshot, hoursPlayed: hoursVal, text: textVal };
+
+      fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).then(async r => {
+        const respData = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          reviews = prevReviewsBackup;
+          renderApp(false);
+          showToast(respData.error || 'Не удалось сохранить обзор');
+          return;
+        }
+        if (!isEdit && ((gameSnapshot.initGenres && gameSnapshot.initGenres.length) || (gameSnapshot.initTags && gameSnapshot.initTags.length))) {
+          const mr = await fetch('/api/games/meta', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              appId: gameSnapshot.appId,
+              gameTitle: gameSnapshot.title,
+              genres: gameSnapshot.initGenres || [],
+              tags: gameSnapshot.initTags || []
+            })
+          }).catch(() => null);
+          if (mr && mr.ok) {
+            const md = await mr.json();
+            if (md && md.reviews) respData.reviews = md.reviews;
+          }
+        }
+        if (respData.reviews) {
+          reviews = respData.reviews;
+          renderApp(false);
+        }
+      }).catch(() => {
+        reviews = prevReviewsBackup;
+        renderApp(false);
+        showToast('Ошибка сети при сохранении обзора');
+      });
     };
     let feedSearchTimer = null;
     function renderFeedListOnly() {
