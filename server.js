@@ -321,6 +321,7 @@ async function initDb() {
       app_id INTEGER NOT NULL DEFAULT 0,
       game_title TEXT NOT NULL,
       game_img TEXT,
+      sort_order INTEGER NOT NULL DEFAULT 0,
       created_at BIGINT NOT NULL
     );
   `);
@@ -333,6 +334,7 @@ async function initDb() {
     ALTER TABLE comments ADD COLUMN IF NOT EXISTS reply_to_text TEXT;
     ALTER TABLE game_tags ADD COLUMN IF NOT EXISTS genres_json TEXT;
     ALTER TABLE game_tags ADD COLUMN IF NOT EXISTS user_tags_json TEXT;
+    ALTER TABLE user_game_lists ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0;
   `);
   console.log('Облачная база PostgreSQL подключена и таблицы готовы.');
   // Backfill achievements for existing reviews in background
@@ -1222,7 +1224,7 @@ app.post('/api/games/meta', requireAuth, async (req, res) => {
 });
 
 async function fetchAllLists() {
-  const { rows } = await pool.query('SELECT * FROM user_game_lists ORDER BY created_at DESC');
+  const { rows } = await pool.query('SELECT * FROM user_game_lists ORDER BY sort_order ASC, created_at DESC');
   return rows.map(r => ({
     id: r.id,
     userId: r.user_steam_id,
@@ -1230,6 +1232,7 @@ async function fetchAllLists() {
     appId: Number(r.app_id) || 0,
     gameTitle: r.game_title,
     gameImg: r.game_img || '',
+    sortOrder: Number(r.sort_order) || 0,
     createdAt: Number(r.created_at)
   }));
 }
@@ -1257,20 +1260,46 @@ app.post('/api/lists', requireAuth, async (req, res) => {
       ? await pool.query('SELECT id FROM user_game_lists WHERE user_steam_id = $1 AND app_id = $2 LIMIT 1', [req.user.steam_id, numAppId])
       : await pool.query('SELECT id FROM user_game_lists WHERE user_steam_id = $1 AND app_id = 0 AND LOWER(TRIM(game_title)) = LOWER(TRIM($2)) LIMIT 1', [req.user.steam_id, cleanTitle]);
 
+    const minRes = await pool.query('SELECT COALESCE(MIN(sort_order), 1) AS min_ord FROM user_game_lists WHERE user_steam_id = $1 AND list_type = $2', [req.user.steam_id, listType]);
+    const nextSortOrder = (Number(minRes.rows[0]?.min_ord) || 1) - 1;
+
     if (existing.rows[0]) {
-      await pool.query('UPDATE user_game_lists SET list_type = $1, game_img = COALESCE(NULLIF($2, \'\'), game_img), created_at = $3 WHERE id = $4', [listType, cleanImg, Date.now(), existing.rows[0].id]);
+      await pool.query('UPDATE user_game_lists SET list_type = $1, game_img = COALESCE(NULLIF($2, \'\'), game_img), sort_order = $3, created_at = $4 WHERE id = $5', [listType, cleanImg, nextSortOrder, Date.now(), existing.rows[0].id]);
       return res.json({ id: existing.rows[0].id, lists: await fetchAllLists() });
     }
 
     const id = 'lst_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
     await pool.query(`
-      INSERT INTO user_game_lists (id, user_steam_id, list_type, app_id, game_title, game_img, created_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-    `, [id, req.user.steam_id, listType, numAppId, cleanTitle, cleanImg, Date.now()]);
+      INSERT INTO user_game_lists (id, user_steam_id, list_type, app_id, game_title, game_img, sort_order, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `, [id, req.user.steam_id, listType, numAppId, cleanTitle, cleanImg, nextSortOrder, Date.now()]);
 
     res.status(201).json({ id, lists: await fetchAllLists() });
   } catch (err) {
     res.status(500).json({ error: 'Ошибка добавления игры в список' });
+  }
+});
+
+app.put('/api/lists/reorder', requireAuth, async (req, res) => {
+  try {
+    const { listType, orderedIds } = req.body || {};
+    if (!['want', 'playing'].includes(listType) || !Array.isArray(orderedIds)) {
+      return res.status(400).json({ error: 'Неверные данные сортировки' });
+    }
+    const cleanIds = orderedIds.map(x => String(x || '').trim()).filter(Boolean).slice(0, 500);
+    if (!cleanIds.length) return res.json({ ok: true });
+    await pool.query(`
+      UPDATE user_game_lists AS u
+      SET sort_order = v.ord
+      FROM (
+        SELECT unnest($1::text[]) AS id, generate_series(0, array_length($1::text[], 1) - 1) AS ord
+      ) AS v
+      WHERE u.id = v.id AND u.user_steam_id = $2 AND u.list_type = $3
+    `, [cleanIds, req.user.steam_id, listType]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Reorder lists error:', err);
+    res.status(500).json({ error: 'Ошибка сохранения порядка игр' });
   }
 });
 
@@ -1281,7 +1310,9 @@ app.patch('/api/lists/:id', requireAuth, async (req, res) => {
     const { rows } = await pool.query('SELECT user_steam_id FROM user_game_lists WHERE id = $1', [req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: 'Запись не найдена' });
     if (rows[0].user_steam_id !== req.user.steam_id) return res.status(403).json({ error: 'Нет прав' });
-    await pool.query('UPDATE user_game_lists SET list_type = $1, created_at = $2 WHERE id = $3', [listType, Date.now(), req.params.id]);
+    const minRes = await pool.query('SELECT COALESCE(MIN(sort_order), 1) AS min_ord FROM user_game_lists WHERE user_steam_id = $1 AND list_type = $2', [req.user.steam_id, listType]);
+    const nextSortOrder = (Number(minRes.rows[0]?.min_ord) || 1) - 1;
+    await pool.query('UPDATE user_game_lists SET list_type = $1, sort_order = $2, created_at = $3 WHERE id = $4', [listType, nextSortOrder, Date.now(), req.params.id]);
     res.json({ ok: true, lists: await fetchAllLists() });
   } catch (err) {
     res.status(500).json({ error: 'Ошибка перемещения игры' });
