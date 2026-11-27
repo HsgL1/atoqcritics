@@ -311,6 +311,15 @@
       transform: translateY(130%);
       pointer-events: none;
     }
+
+    @keyframes criticBadgePop {
+      0% { opacity: 0; transform: translateY(6px) scale(0.92); }
+      70% { opacity: 1; transform: translateY(-1px) scale(1.02); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .anim-critic-badge {
+      animation: criticBadgePop 0.36s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
   </style>
 </head>
 <body>
@@ -897,7 +906,7 @@
     let notifications = [], notifFilter = 'all', notifOpen = false;
     let gamesSubTab = 'best', gamesCatFilter = 'all', gamesSelectedGenres = new Set(), gamesSelectedTags = new Set(), gamesSelectedCommunityTags = new Set(), gamesFiltersOpen = false, gamesShowAllTags = false;
     let userGameLists = [], profileSubTab = 'reviews', profileListSort = 'custom', selectedSwapListId = null, modalMode = 'review';
-    let activeView = 'home', profileUserId = null, searchTab = 'all', selectedGame = null, editingReviewId = null;
+    let activeView = 'home', profileUserId = null, searchTab = 'all', selectedGame = null, editingReviewId = null, prefetchedRatings = null, lastPublishedReviewId = null;
     let lastDisplayedGames = [];
     let modalScores = { gameplay: 16, visuals: 16, narrative: 16, audio: 16, emotions: 16 };
     let modalNoNarrative = false;
@@ -1309,7 +1318,7 @@
       }
     }
 
-    function renderExternalRatingPills(ext, siteScore = null, showDelta = false) {
+    function renderExternalRatingPills(ext, siteScore = null, showDelta = false, animate = false) {
       if (!ext) return '';
       const hasMc = ext.mcScore !== null && ext.mcScore !== undefined;
       const hasOc = ext.ocScore !== null && ext.ocScore !== undefined;
@@ -1335,9 +1344,10 @@
           <span class="text-[11px] sm:text-xs font-bold text-[#ffe588] tracking-tight">Metacritic</span>
           <span class="px-1.5 sm:px-2 py-0.5 rounded-lg text-xs sm:text-[13px] font-black text-[#090c12] tabular-nums leading-none shadow-sm" style="background:${mcBadgeBg(s)};">${s}</span>
         `;
+        const animMc = animate ? 'anim-critic-badge' : '';
         parts.push(ext.mcUrl
-          ? `<a href="${esc(ext.mcUrl)}" target="_blank" rel="noopener" title="Открыть на Metacritic (${s}/100)" class="inline-flex items-center gap-1.5 pl-1.5 pr-1.5 py-1 rounded-xl bg-[#ffcc34]/[0.09] hover:bg-[#ffcc34]/[0.17] border border-[#ffcc34]/35 transition">${inner}</a>`
-          : `<span title="Metacritic: ${s}/100" class="inline-flex items-center gap-1.5 pl-1.5 pr-1.5 py-1 rounded-xl bg-[#ffcc34]/[0.09] border border-[#ffcc34]/35">${inner}</span>`);
+          ? `<a href="${esc(ext.mcUrl)}" target="_blank" rel="noopener" title="Открыть на Metacritic (${s}/100)" class="${animMc} inline-flex items-center gap-1.5 pl-1.5 pr-1.5 py-1 rounded-xl bg-[#ffcc34]/[0.09] hover:bg-[#ffcc34]/[0.17] border border-[#ffcc34]/35 transition">${inner}</a>`
+          : `<span title="Metacritic: ${s}/100" class="${animMc} inline-flex items-center gap-1.5 pl-1.5 pr-1.5 py-1 rounded-xl bg-[#ffcc34]/[0.09] border border-[#ffcc34]/35">${inner}</span>`);
       }
       if (hasOc) {
         const s = Number(ext.ocScore);
@@ -1347,9 +1357,11 @@
           <span class="text-[11px] sm:text-xs font-bold text-[#ffb59a] tracking-tight">OpenCritic</span>
           <span class="px-1.5 sm:px-2 py-0.5 rounded-lg text-xs sm:text-[13px] font-black text-[#090c12] tabular-nums leading-none shadow-sm" style="background:${ocTierBg(ext.ocTier, s)};">${s}</span>
         `;
+        const animOc = animate ? 'anim-critic-badge' : '';
+        const ocStyle = animate ? 'style="animation-delay:60ms;"' : '';
         parts.push(ext.ocUrl
-          ? `<a href="${esc(ext.ocUrl)}" target="_blank" rel="noopener" title="Открыть на OpenCritic (${s}/100${tierLbl})" class="inline-flex items-center gap-1.5 pl-1.5 pr-1.5 py-1 rounded-xl bg-[#ff5e2b]/[0.10] hover:bg-[#ff5e2b]/[0.18] border border-[#ff5e2b]/35 transition">${inner}</a>`
-          : `<span title="OpenCritic: ${s}/100${tierLbl}" class="inline-flex items-center gap-1.5 pl-1.5 pr-1.5 py-1 rounded-xl bg-[#ff5e2b]/[0.10] border border-[#ff5e2b]/35">${inner}</span>`);
+          ? `<a href="${esc(ext.ocUrl)}" target="_blank" rel="noopener" ${ocStyle} title="Открыть на OpenCritic (${s}/100${tierLbl})" class="${animOc} inline-flex items-center gap-1.5 pl-1.5 pr-1.5 py-1 rounded-xl bg-[#ff5e2b]/[0.10] hover:bg-[#ff5e2b]/[0.18] border border-[#ff5e2b]/35 transition">${inner}</a>`
+          : `<span ${ocStyle} title="OpenCritic: ${s}/100${tierLbl}" class="${animOc} inline-flex items-center gap-1.5 pl-1.5 pr-1.5 py-1 rounded-xl bg-[#ff5e2b]/[0.10] border border-[#ff5e2b]/35">${inner}</span>`);
       }
 
       if (showDelta && siteScore !== null && siteScore !== undefined) {
@@ -1364,7 +1376,7 @@
             const cls = diff > 0
               ? 'text-[#9bd6f9] bg-[#66c0f4]/12 border-[#66c0f4]/30'
               : 'text-rose-300 bg-rose-500/12 border-rose-400/30';
-            parts.push(`<span title="Среднее прессы: ${avgCritic}" class="inline-flex items-center px-2.5 py-1 rounded-xl text-[11px] font-semibold border ${cls} tabular-nums">${sign}${diff} к прессе</span>`);
+            parts.push(`<span ${animate ? 'style="animation-delay:115ms;"' : ''} title="Среднее прессы: ${avgCritic}" class="${animate ? 'anim-critic-badge' : ''} inline-flex items-center px-2.5 py-1 rounded-xl text-[11px] font-semibold border ${cls} tabular-nums">${sign}${diff} к прессе</span>`);
           }
         }
       }
@@ -1646,7 +1658,7 @@
                     ${rev.hoursPlayed ? `<span class="text-sm font-semibold text-[#7ccaf8]">• ${rev.hoursPlayed} ч.</span>` : ''}
                     ${renderAchievementsBadge(rev)}
                   </div>
-                  ${renderExternalRatingPills(rev.externalRatings, rev.total, true) ? `<div class="flex items-center gap-1.5 mt-2 flex-wrap">${renderExternalRatingPills(rev.externalRatings, rev.total, true)}</div>` : ''}
+                  ${(() => { const animExt = animate || (rev.id === lastPublishedReviewId); const p = renderExternalRatingPills(rev.externalRatings, rev.total, true, animExt); if (p) return `<div class="flex items-center gap-1.5 mt-2 flex-wrap">${p}</div>`; if (rev._loadingRatings) return '<div class="flex items-center gap-1.5 mt-2"><span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] text-slate-400 bg-white/[0.04] border border-white/10 animate-pulse">Подтягиваем Metacritic / OpenCritic...</span></div>'; return ''; })()}
                 </div>
                 <!-- Metacritic-style colored background score badge with site-obsidian numbers -->
                 <div class="rounded-2xl min-w-[66px] sm:min-w-[78px] px-2.5 sm:px-3.5 py-2 sm:py-2.5 text-center shrink-0" style="background:${m.bg}; box-shadow:${m.shadow};">
@@ -2164,7 +2176,7 @@
                         </div>
                         <span class="text-xs text-slate-400 font-medium">${g.count} ${g.count === 1 ? 'оценка' : (g.count < 5 ? 'оценки' : 'оценок')}</span>
                       </div>
-                      ${renderExternalRatingPills(g.externalRatings, g.avg, true) ? `<div class="flex items-center gap-1.5 mt-1.5 flex-wrap">${renderExternalRatingPills(g.externalRatings, g.avg, true)}</div>` : ''}
+                      ${renderExternalRatingPills(g.externalRatings, g.avg, true, animateCards) ? `<div class="flex items-center gap-1.5 mt-1.5 flex-wrap">${renderExternalRatingPills(g.externalRatings, g.avg, true, animateCards)}</div>` : ''}
                     </div>
                     <div class="rounded-2xl min-w-[58px] px-2.5 py-2 text-center shrink-0" style="background:${m.bg}; box-shadow:${m.shadow};">
                       <div class="text-2xl font-black leading-none text-[#090c12] tabular-nums">${g.avg}</div>
@@ -2541,6 +2553,20 @@
 
     function openRateStep(game) {
       selectedGame = game;
+      prefetchedRatings = null;
+      if (game && (game.appId > 0 || game.title)) {
+        const gSnapTitle = game.title;
+        const gSnapAppId = Number(game.appId) || 0;
+        fetch('/api/games/ratings/prefetch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ appId: gSnapAppId, gameTitle: gSnapTitle })
+        }).then(r => r.ok ? r.json() : null).then(d => {
+          if (d && d.ratings && selectedGame && selectedGame.title === gSnapTitle) {
+            prefetchedRatings = d.ratings;
+          }
+        }).catch(() => {});
+      }
       const searchStep = document.getElementById('modal-step-search');
       const form = document.getElementById('review-form');
       searchStep.classList.add('hidden');
@@ -2909,8 +2935,12 @@
           existing.text = textVal;
         }
       } else {
+        const tmpRevId = 'rev_tmp_' + Date.now();
+        lastPublishedReviewId = tmpRevId;
         reviews.unshift({
-          id: 'rev_tmp_' + Date.now(),
+          id: tmpRevId,
+          externalRatings: prefetchedRatings || null,
+          _loadingRatings: !prefetchedRatings,
           userId: currentUser.steam_id,
           authorName: currentUser.name,
           authorAvatar: currentUser.avatar || '/logo.jpg',
@@ -2980,8 +3010,10 @@
           }
         }
         if (respData.reviews) {
+          if (respData.id) lastPublishedReviewId = respData.id;
           reviews = respData.reviews;
           renderApp(false);
+          setTimeout(() => { lastPublishedReviewId = null; }, 900);
         }
       }).catch(() => {
         reviews = prevReviewsBackup;
