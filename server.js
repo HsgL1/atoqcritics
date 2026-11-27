@@ -226,6 +226,9 @@ async function initDb() {
     ALTER TABLE reviews ADD COLUMN IF NOT EXISTS ach_unlocked INTEGER;
     ALTER TABLE reviews ADD COLUMN IF NOT EXISTS ach_total INTEGER;
     ALTER TABLE reviews ADD COLUMN IF NOT EXISTS no_narrative BOOLEAN DEFAULT FALSE;
+    ALTER TABLE comments ADD COLUMN IF NOT EXISTS reply_to_id TEXT;
+    ALTER TABLE comments ADD COLUMN IF NOT EXISTS reply_to_author TEXT;
+    ALTER TABLE comments ADD COLUMN IF NOT EXISTS reply_to_text TEXT;
   `);
   console.log('Облачная база PostgreSQL подключена и таблицы готовы.');
   // Backfill achievements for existing reviews in background
@@ -524,6 +527,9 @@ async function hydrateReviews() {
       authorName: c.author_name,
       authorAvatar: c.author_avatar,
       text: c.text,
+      replyToId: c.reply_to_id || null,
+      replyToAuthor: c.reply_to_author || null,
+      replyToText: c.reply_to_text || null,
       createdAt: Number(c.created_at)
     });
   });
@@ -732,14 +738,18 @@ app.post('/api/reviews/:id/react', requireAuth, async (req, res) => {
 
 app.post('/api/reviews/:id/comments', requireAuth, async (req, res) => {
   try {
-    const text = String((req.body && req.body.text) || '').trim();
+    const body = req.body || {};
+    const text = String(body.text || '').trim();
     if (!text) return res.status(400).json({ error: 'Пустой комментарий' });
     const id = 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+    const replyToId = body.replyToId ? String(body.replyToId).slice(0, 80) : null;
+    const replyToAuthor = body.replyToAuthor ? String(body.replyToAuthor).slice(0, 80) : null;
+    const replyToText = body.replyToText ? String(body.replyToText).slice(0, 140) : null;
     await pool.query(`
-      INSERT INTO comments (id, review_id, user_steam_id, text, created_at)
-      VALUES ($1, $2, $3, $4, $5)
-    `, [id, req.params.id, req.user.steam_id, text.slice(0, 500), Date.now()]);
-    res.status(201).json({ reviews: await hydrateReviews() });
+      INSERT INTO comments (id, review_id, user_steam_id, text, reply_to_id, reply_to_author, reply_to_text, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `, [id, req.params.id, req.user.steam_id, text.slice(0, 800), replyToId, replyToAuthor, replyToText, Date.now()]);
+    res.status(201).json({ id, reviews: await hydrateReviews() });
   } catch (err) {
     res.status(500).json({ error: 'Ошибка добавления комментария' });
   }
