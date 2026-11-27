@@ -1533,24 +1533,26 @@ app.post('/api/reviews', requireAuth, async (req, res) => {
       await pool.query('DELETE FROM user_game_lists WHERE user_steam_id = $1 AND app_id = 0 AND LOWER(TRIM(game_title)) = LOWER(TRIM($2))', [req.user.steam_id, String(gameTitle)]).catch(() => {});
     }
 
-    // Fetch Metacritic & OpenCritic (with 4.5s cap) BEFORE returning so ratings appear immediately without page reload!
-    await Promise.race([
-      ensureExternalRatings(numAppId, String(gameTitle), false, { allowOc: true }).catch(() => {}),
-      new Promise(r => setTimeout(r, 4500))
-    ]);
-
-    res.status(201).json({ id, reviews: await hydrateReviews() });
-
-    // Fetch Steam achievements & Steam tags in background
+    // Fetch Steam achievements, Steam tags, and Metacritic/OpenCritic IN PARALLEL (with 4.5s cap) BEFORE returning
+    // so achievements & critic badges appear immediately without reloading the page!
+    const uid = req.user.steam_id;
+    const enrichTasks = [
+      ensureExternalRatings(numAppId, String(gameTitle), false, { allowOc: true }).catch(() => {})
+    ];
     if (numAppId > 0) {
-      const uid = req.user.steam_id;
-      Promise.all([
+      enrichTasks.push(
         fetchSteamAchievements(uid, numAppId).then(ach => {
           if (ach) return pool.query('UPDATE reviews SET ach_unlocked = $1, ach_total = $2 WHERE id = $3', [ach.unlocked, ach.total, id]);
         }).catch(() => {}),
         ensureGameTags(numAppId).catch(() => {})
-      ]).catch(() => {});
+      );
     }
+    await Promise.race([
+      Promise.all(enrichTasks),
+      new Promise(r => setTimeout(r, 4500))
+    ]);
+
+    res.status(201).json({ id, reviews: await hydrateReviews() });
   } catch (err) {
     res.status(500).json({ error: 'Ошибка сохранения обзора' });
   }
