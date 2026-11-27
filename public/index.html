@@ -486,21 +486,21 @@
         </div>
         <div id="profile-header-card" class="liquid-glass rounded-[28px] p-5 sm:p-6"></div>
 
-        <!-- Profile Sub-Tabs: Обзоры / Играю / Хочу поиграть -->
+        <!-- Profile Sub-Tabs: Хочу поиграть / Играю / Обзоры -->
         <div id="profile-subtabs" class="liquid-glass rounded-full p-1.5 grid grid-cols-3 gap-1 sm:inline-grid sm:w-auto">
-          <button type="button" data-profile-tab="reviews" class="liquid-pill liquid-pill-active px-3 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 cursor-pointer">
-            <span>Обзоры</span>
-            <span id="ptab-cnt-reviews" class="text-[11px] opacity-75 tabular-nums">0</span>
+          <button type="button" data-profile-tab="want" class="liquid-pill px-3 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 cursor-pointer">
+            <i data-lucide="clock" class="w-3.5 h-3.5 text-[#66c0f4] shrink-0 hidden sm:inline"></i>
+            <span class="truncate">Хочу поиграть</span>
+            <span id="ptab-cnt-want" class="text-[11px] opacity-75 tabular-nums">0</span>
           </button>
           <button type="button" data-profile-tab="playing" class="liquid-pill px-3 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 cursor-pointer">
             <i data-lucide="gamepad-2" class="w-3.5 h-3.5 text-[#d9ff00] shrink-0 hidden sm:inline"></i>
             <span>Играю</span>
             <span id="ptab-cnt-playing" class="text-[11px] opacity-75 tabular-nums">0</span>
           </button>
-          <button type="button" data-profile-tab="want" class="liquid-pill px-3 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 cursor-pointer">
-            <i data-lucide="clock" class="w-3.5 h-3.5 text-[#66c0f4] shrink-0 hidden sm:inline"></i>
-            <span class="truncate">Хочу поиграть</span>
-            <span id="ptab-cnt-want" class="text-[11px] opacity-75 tabular-nums">0</span>
+          <button type="button" data-profile-tab="reviews" class="liquid-pill liquid-pill-active px-3 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 cursor-pointer">
+            <span>Обзоры</span>
+            <span id="ptab-cnt-reviews" class="text-[11px] opacity-75 tabular-nums">0</span>
           </button>
         </div>
 
@@ -806,12 +806,36 @@
       const title = img.alt || 'GAME';
       img.dataset.fbStep = String(step + 1);
       if (appId > 0) {
-        if (step === 0) { img.src = `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/library_600x900_2x.jpg`; return; }
-        if (step === 1 && headerFallback) { img.src = headerFallback; return; }
-        if (step === 2) { img.src = `/api/steam/cover/${appId}`; return; }
+        if (step === 0) { img.src = `/api/steam/poster/${appId}`; return; }
+        if (step === 1) { img.src = `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/library_600x900_2x.jpg`; return; }
+        if (step === 2 && headerFallback) { img.src = headerFallback; return; }
+        if (step === 3) { img.src = `/api/steam/cover/${appId}`; return; }
       }
       img.onerror = null;
       img.src = makeVerticalFallbackPoster(title);
+    };
+
+    window.handlePosterLoad = function(img) {
+      const wrap = img.parentElement;
+      if (!wrap) return;
+      const oldBg = wrap.querySelector('.poster-ambient-bg');
+      const isLandscape = img.naturalWidth > 0 && img.naturalHeight > 0 && (img.naturalWidth / img.naturalHeight) > 1.3;
+      if (isLandscape) {
+        img.classList.remove('object-cover', 'group-hover:scale-105');
+        img.classList.add('object-contain', 'relative', 'z-[1]', 'p-1.5', 'drop-shadow-[0_6px_16px_rgba(0,0,0,0.75)]');
+        if (!oldBg) {
+          const bg = document.createElement('div');
+          bg.className = 'poster-ambient-bg absolute inset-0 bg-center bg-cover scale-125 blur-xl opacity-55 pointer-events-none';
+          bg.style.backgroundImage = `url("${img.currentSrc || img.src}")`;
+          wrap.insertBefore(bg, img);
+        } else {
+          oldBg.style.backgroundImage = `url("${img.currentSrc || img.src}")`;
+        }
+      } else {
+        if (oldBg) oldBg.remove();
+        img.classList.remove('object-contain', 'relative', 'z-[1]', 'p-1.5', 'drop-shadow-[0_6px_16px_rgba(0,0,0,0.75)]');
+        img.classList.add('object-cover', 'group-hover:scale-105');
+      }
     };
 
     function sliderTrackBg(val, color, maxVal = 20) {
@@ -2107,7 +2131,9 @@
       }).join('');
     }
 
+    let steamSearchSeq = 0;
     async function renderSearchResults(animate = false) {
+      const mySeq = ++steamSearchSeq;
       const q = document.getElementById('steam-game-search').value.trim();
       const status = document.getElementById('steam-search-status');
       const box = document.getElementById('steam-search-results');
@@ -2139,8 +2165,11 @@
         return;
       }
       status.textContent = 'Поиск в Steam...';
+      if (animate) box.innerHTML = '';
       const r = await fetch('/api/steam/search?q=' + encodeURIComponent(q));
+      if (mySeq !== steamSearchSeq) return;
       const d = await r.json();
+      if (mySeq !== steamSearchSeq) return;
       const list = d.games || [];
       status.textContent = `Найдено в Steam: ${list.length}`;
       box.innerHTML = renderGameButtons(list, false, animate);
@@ -2241,14 +2270,14 @@
       document.getElementById('custom-game-file').value = '';
       customCoverDataUrl = '';
       document.getElementById('custom-game-preview-wrap').classList.add('hidden');
-      setSearchTab('all');
+      document.getElementById('steam-search-results').innerHTML = '';
       openModal();
       const searchStep = document.getElementById('modal-step-search');
       searchStep.classList.remove('hidden', 'anim-step-left');
       void searchStep.offsetWidth;
       searchStep.classList.add('anim-step-left');
       document.getElementById('review-form').classList.add('hidden');
-      renderSearchResults(true);
+      setSearchTab('all');
     };
     document.getElementById('btn-close-modal').onclick = document.getElementById('btn-cancel-review').onclick = () => closeModal();
     document.getElementById('review-modal').onclick = e => { if (e.target.id === 'review-modal') closeModal(); };
@@ -2437,7 +2466,12 @@
       }).then(r => r.ok ? r.json() : null).then(d => {
         if (d && d.lists) {
           userGameLists = d.lists;
-          if (activeView === 'profile') renderApp(false);
+          const realId = d.id || (d.item && d.item.id);
+          if (realId) {
+            document.querySelectorAll(`[data-del-list-item="${tempId}"]`).forEach(el => { el.dataset.delListItem = realId; });
+            document.querySelectorAll(`[data-move-list-item="${tempId}"]`).forEach(el => { el.dataset.moveListItem = realId; });
+            document.querySelectorAll(`[data-rate-from-list="${tempId}"]`).forEach(el => { el.dataset.rateFromList = realId; });
+          }
         }
       }).catch(() => {});
     }
@@ -2662,6 +2696,7 @@
                 src="${esc(posterUrl)}"
                 data-appid="${item.appId}"
                 data-header-img="${esc(item.gameImg || '')}"
+                onload="handlePosterLoad(this)"
                 onerror="handlePosterError(this)"
                 alt="${esc(item.gameTitle)}"
                 class="w-full h-full object-cover group-hover:scale-105 transition duration-300"
@@ -3519,14 +3554,14 @@
       document.getElementById('custom-game-file').value = '';
       customCoverDataUrl = '';
       document.getElementById('custom-game-preview-wrap').classList.add('hidden');
-      setSearchTab('all');
+      document.getElementById('steam-search-results').innerHTML = '';
       openModal();
       const searchStep = document.getElementById('modal-step-search');
       searchStep.classList.remove('hidden', 'anim-step-left');
       void searchStep.offsetWidth;
       searchStep.classList.add('anim-step-left');
       document.getElementById('review-form').classList.add('hidden');
-      renderSearchResults(true);
+      setSearchTab('all');
     };
 
     boot();
