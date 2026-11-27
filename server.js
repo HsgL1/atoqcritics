@@ -313,6 +313,16 @@ async function initDb() {
       tags_json TEXT NOT NULL DEFAULT '[]',
       updated_at BIGINT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS user_game_lists (
+      id TEXT PRIMARY KEY,
+      user_steam_id TEXT NOT NULL REFERENCES users(steam_id) ON DELETE CASCADE,
+      list_type TEXT NOT NULL,
+      app_id INTEGER NOT NULL DEFAULT 0,
+      game_title TEXT NOT NULL,
+      game_img TEXT,
+      created_at BIGINT NOT NULL
+    );
   `);
   await pool.query(`
     ALTER TABLE reviews ADD COLUMN IF NOT EXISTS ach_unlocked INTEGER;
@@ -794,6 +804,13 @@ app.post('/api/reviews', requireAuth, async (req, res) => {
       Date.now()
     ]);
 
+    // If the game was in user's 'want' or 'playing' list, remove it automatically once reviewed
+    if (numAppId > 0) {
+      await pool.query('DELETE FROM user_game_lists WHERE user_steam_id = $1 AND app_id = $2', [req.user.steam_id, numAppId]).catch(() => {});
+    } else {
+      await pool.query('DELETE FROM user_game_lists WHERE user_steam_id = $1 AND app_id = 0 AND LOWER(TRIM(game_title)) = LOWER(TRIM($2))', [req.user.steam_id, String(gameTitle)]).catch(() => {});
+    }
+
     res.status(201).json({ id, reviews: await hydrateReviews() });
 
     // Fetch Steam achievements & Steam tags in background so review modal closes immediately!
@@ -1160,6 +1177,85 @@ app.post('/api/games/meta', requireAuth, async (req, res) => {
     res.json({ ok: true, reviews: await hydrateReviews() });
   } catch (err) {
     res.status(500).json({ error: 'Ошибка сохранения жанров и меток' });
+  }
+});
+
+async function fetchAllLists() {
+  const { rows } = await pool.query('SELECT * FROM user_game_lists ORDER BY created_at DESC');
+  return rows.map(r => ({
+    id: r.id,
+    userId: r.user_steam_id,
+    listType: r.list_type,
+    appId: Number(r.app_id) || 0,
+    gameTitle: r.game_title,
+    gameImg: r.game_img || '',
+    createdAt: Number(r.created_at)
+  }));
+}
+
+app.get('/api/lists', requireAuth, async (req, res) => {
+  try {
+    res.json({ lists: await fetchAllLists() });
+  } catch (err) {
+    res.status(500).json({ error: 'Ошибка загрузки списков игр' });
+  }
+});
+
+app.post('/api/lists', requireAuth, async (req, res) => {
+  try {
+    const { listType, appId, gameTitle, gameImg } = req.body || {};
+    if (!['want', 'playing'].includes(listType) || !gameTitle) {
+      return res.status(400).json({ error: 'Укажите игру и список' });
+    }
+    const numAppId = Number(appId) || 0;
+    const cleanTitle = String(gameTitle).trim().slice(0, 150);
+    const cleanImg = gameImg ? String(gameImg) : (numAppId > 0 ? `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${numAppId}/header.jpg` : '');
+
+    // Check if this game is already in user's lists — if so, move/update it cleanly instead of duplicating
+    const existing = numAppId > 0
+      ? await pool.query('SELECT id FROM user_game_lists WHERE user_steam_id = $1 AND app_id = $2 LIMIT 1', [req.user.steam_id, numAppId])
+      : await pool.query('SELECT id FROM user_game_lists WHERE user_steam_id = $1 AND app_id = 0 AND LOWER(TRIM(game_title)) = LOWER(TRIM($2)) LIMIT 1', [req.user.steam_id, cleanTitle]);
+
+    if (existing.rows[0]) {
+      await pool.query('UPDATE user_game_lists SET list_type = $1, game_img = COALESCE(NULLIF($2, \'\'), game_img), created_at = $3 WHERE id = $4', [listType, cleanImg, Date.now(), existing.rows[0].id]);
+      return res.json({ id: existing.rows[0].id, lists: await fetchAllLists() });
+    }
+
+    const id = 'lst_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+    await pool.query(`
+      INSERT INTO user_game_lists (id, user_steam_id, list_type, app_id, game_title, game_img, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `, [id, req.user.steam_id, listType, numAppId, cleanTitle, cleanImg, Date.now()]);
+
+    res.status(201).json({ id, lists: await fetchAllLists() });
+  } catch (err) {
+    res.status(500).json({ error: 'Ошибка добавления игры в список' });
+  }
+});
+
+app.patch('/api/lists/:id', requireAuth, async (req, res) => {
+  try {
+    const listType = req.body && req.body.listType;
+    if (!['want', 'playing'].includes(listType)) return res.status(400).json({ error: 'Invalid listType' });
+    const { rows } = await pool.query('SELECT user_steam_id FROM user_game_lists WHERE id = $1', [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Запись не найдена' });
+    if (rows[0].user_steam_id !== req.user.steam_id) return res.status(403).json({ error: 'Нет прав' });
+    await pool.query('UPDATE user_game_lists SET list_type = $1, created_at = $2 WHERE id = $3', [listType, Date.now(), req.params.id]);
+    res.json({ ok: true, lists: await fetchAllLists() });
+  } catch (err) {
+    res.status(500).json({ error: 'Ошибка перемещения игры' });
+  }
+});
+
+app.delete('/api/lists/:id', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT user_steam_id FROM user_game_lists WHERE id = $1', [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Запись не найдена' });
+    if (rows[0].user_steam_id !== req.user.steam_id) return res.status(403).json({ error: 'Нет прав' });
+    await pool.query('DELETE FROM user_game_lists WHERE id = $1', [req.params.id]);
+    res.json({ ok: true, lists: await fetchAllLists() });
+  } catch (err) {
+    res.status(500).json({ error: 'Ошибка удаления игры из списка' });
   }
 });
 
