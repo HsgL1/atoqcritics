@@ -170,6 +170,7 @@
     .anim-pop { animation: popBounce 0.32s cubic-bezier(0.22, 1, 0.36, 1) both; }
     .anim-popover { animation: popoverIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) both; }
     .anim-drawer { animation: drawerExpand 0.24s cubic-bezier(0.22, 1, 0.36, 1) both; }
+    .anim-comment-in { animation: fadeSlideUp 0.28s cubic-bezier(0.22, 1, 0.36, 1) both; }
 
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -500,9 +501,19 @@
     let lastDisplayedGames = [];
     let modalScores = { gameplay: 16, visuals: 16, narrative: 16, audio: 16, emotions: 16 };
     let modalNoNarrative = false;
-    let openComments = {}, openEmojiPickerId = null, lastAnimatedReaction = null, searchTimer = null;
+    let openComments = {}, replyingTo = {}, lastAddedCommentId = null, openEmojiPickerId = null, lastAnimatedReaction = null, searchTimer = null;
 
     const esc = s => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    function formatCommentTime(ts) {
+      if (!ts) return '';
+      const diffSec = Math.floor((Date.now() - Number(ts)) / 1000);
+      if (diffSec < 45) return 'только что';
+      const diffMin = Math.floor(diffSec / 60);
+      if (diffMin < 60) return `${diffMin} мин назад`;
+      const diffH = Math.floor(diffMin / 60);
+      if (diffH < 24) return `${diffH} ч назад`;
+      return new Date(Number(ts)).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+    }
     const scoreMeta = s => s >= 90
       ? { l: 'Шедевр', c: '#d9ff00', bg: 'linear-gradient(135deg, #d9ff00 0%, #9ef01a 100%)', shadow: '0 8px 24px rgba(217,255,0,0.28)' }
       : s >= 75
@@ -795,23 +806,76 @@
     }
 
     function renderCommentsDrawer(rev) {
+      const replyTarget = replyingTo[rev.id] || null;
       return `
-        <div class="anim-drawer rounded-2xl bg-black/30 border border-white/10 p-3 space-y-2.5">
-          <div class="space-y-1.5">
+        <div class="anim-drawer rounded-2xl bg-gradient-to-b from-black/35 to-black/20 border border-white/[0.11] p-3 sm:p-3.5 space-y-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+          <div class="space-y-2">
             ${rev.comments.map(c => {
               const myCm = c.userId === currentUser.steam_id;
-              return `<div class="flex items-start justify-between gap-2 text-xs sm:text-sm leading-relaxed py-1 border-b border-white/[0.05] last:border-b-0"><div class="min-w-0 break-words"><button type="button" data-open-profile="${esc(c.userId)}" class="font-bold hover:text-[#d9ff00] cursor-pointer">${esc(c.authorName)}</button>: <span class="text-slate-200">${esc(c.text)}</span></div>${myCm ? `<button type="button" data-del-comment="${esc(c.id)}" data-rev-id="${esc(rev.id)}" title="Удалить комментарий" class="text-[11px] text-slate-400 hover:text-rose-400 px-1.5 py-0.5 rounded-lg hover:bg-rose-500/10 transition shrink-0 cursor-pointer">✕</button>` : ''}</div>`;
-            }).join('') || '<div class="text-xs text-slate-400">Комментариев пока нет</div>'}
+              const isFresh = lastAddedCommentId === c.id;
+              return `
+                <div class="${isFresh ? 'anim-comment-in' : ''} rounded-2xl bg-gradient-to-br from-white/[0.065] via-[#66c0f4]/[0.03] to-white/[0.02] border border-white/[0.09] px-3 py-2.5 transition hover:border-white/[0.16]">
+                  <div class="flex items-start gap-2.5">
+                    <button type="button" data-open-profile="${esc(c.userId)}" class="shrink-0 cursor-pointer group">
+                      <img src="${esc(c.authorAvatar || '/logo.jpg')}" class="w-7 h-7 rounded-full object-cover border border-white/20 group-hover:scale-105 transition" />
+                    </button>
+                    <div class="min-w-0 flex-1">
+                      <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2 min-w-0 flex-wrap">
+                          <button type="button" data-open-profile="${esc(c.userId)}" class="text-xs sm:text-sm font-bold text-white hover:text-[#d9ff00] transition truncate cursor-pointer">${esc(c.authorName)}</button>
+                          <span class="text-[10px] text-slate-400 shrink-0">${formatCommentTime(c.createdAt)}</span>
+                        </div>
+                        <div class="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            data-reply-comment="${esc(c.id)}"
+                            data-rev-id="${esc(rev.id)}"
+                            data-reply-author="${esc(c.authorName)}"
+                            data-reply-text="${esc((c.text || '').slice(0, 100))}"
+                            class="text-[11px] font-medium text-[#7ccaf8] hover:text-[#d9ff00] px-2 py-0.5 rounded-full hover:bg-white/[0.08] transition cursor-pointer"
+                          >Ответить</button>
+                          ${myCm ? `<button type="button" data-del-comment="${esc(c.id)}" data-rev-id="${esc(rev.id)}" title="Удалить комментарий" class="text-[11px] text-slate-400 hover:text-rose-400 px-1.5 py-0.5 rounded-full hover:bg-rose-500/15 transition cursor-pointer">✕</button>` : ''}
+                        </div>
+                      </div>
+                      ${c.replyToAuthor ? `
+                        <div class="mt-1.5 mb-1.5 rounded-xl bg-white/[0.045] border-l-2 border-[#d9ff00]/75 px-2.5 py-1 text-[11px] text-slate-300 break-words">
+                          <span class="font-semibold text-[#d9ff00]">↩ ${esc(c.replyToAuthor)}</span>${c.replyToText ? `: <span class="text-slate-400">${esc(c.replyToText)}</span>` : ''}
+                        </div>
+                      ` : ''}
+                      <p class="mt-1 text-xs sm:text-sm text-slate-100 leading-relaxed whitespace-pre-wrap break-words">${esc(c.text)}</p>
+                    </div>
+                  </div>
+                </div>
+              `;
+            }).join('') || '<div class="text-xs text-slate-400 text-center py-2">Комментариев пока нет — напишите первый!</div>'}
           </div>
-          <form data-comment-form="${esc(rev.id)}" class="flex items-center gap-2 relative w-full">
-            <div class="sm:relative shrink-0">
+
+          ${replyTarget ? `
+            <div class="anim-drawer flex items-center justify-between gap-2 rounded-xl bg-[#66c0f4]/12 border border-[#66c0f4]/35 px-3 py-1.5 text-xs">
+              <div class="min-w-0 truncate text-slate-200">
+                <span class="font-semibold text-[#d9ff00]">Ответ для ${esc(replyTarget.author)}:</span>
+                <span class="text-slate-300 ml-1">${esc(replyTarget.text)}</span>
+              </div>
+              <button type="button" data-cancel-reply="${esc(rev.id)}" title="Отменить ответ" class="text-slate-300 hover:text-white px-1.5 py-0.5 rounded-full hover:bg-white/10 shrink-0 cursor-pointer">✕</button>
+            </div>
+          ` : ''}
+
+          <form data-comment-form="${esc(rev.id)}" class="flex items-end gap-2 relative w-full">
+            <div class="sm:relative shrink-0 pb-0.5">
               <button type="button" data-toggle-comment-emoji="${esc(rev.id)}" title="Вставить эмодзи" class="liquid-pill w-9 h-9 rounded-full flex items-center justify-center text-lg cursor-pointer">😀</button>
               <div data-comment-emoji-box="${esc(rev.id)}" class="hidden anim-popover absolute left-0 right-0 sm:right-auto bottom-full mb-2 z-30 liquid-glass-strong rounded-2xl p-2 grid grid-cols-7 gap-1 sm:w-max justify-items-center shadow-2xl">
                 ${EMOJI_PALETTE.map(em => `<button type="button" data-insert-comment-emoji="${esc(rev.id)}" data-emoji="${em}" class="emoji-btn w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-lg cursor-pointer">${em}</button>`).join('')}
               </div>
             </div>
-            <input name="text" required placeholder="Комментарий..." class="flex-1 min-w-0 w-full px-3.5 py-2 rounded-full bg-white/10 text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#66c0f4]" />
-            <button type="submit" aria-label="Отправить" class="btn-acid px-3.5 sm:px-4 py-2 rounded-full text-xs cursor-pointer shrink-0"><span class="hidden sm:inline">Отправить</span><span class="sm:hidden text-sm leading-none">➤</span></button>
+            <textarea
+              name="text"
+              rows="1"
+              maxlength="800"
+              required
+              placeholder="${replyTarget ? `Ответить ${esc(replyTarget.author)}...` : 'Комментарий...'}"
+              class="comment-autogrow flex-1 min-w-0 w-full px-3.5 py-2 rounded-2xl bg-white/[0.09] border border-white/15 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#66c0f4] resize-none overflow-y-auto leading-snug max-h-36 transition"
+            ></textarea>
+            <button type="submit" aria-label="Отправить" class="btn-acid px-3.5 sm:px-4 h-9 rounded-full text-xs cursor-pointer shrink-0 mb-0.5 flex items-center justify-center"><span class="hidden sm:inline">Отправить</span><span class="sm:hidden text-sm leading-none">➤</span></button>
           </form>
         </div>
       `;
@@ -1290,7 +1354,7 @@
       document.getElementById('criteria-sliders-container').innerHTML = activeCriteria.map(c => {
         const val = Math.min(maxVal, Math.max(0, Number(modalScores[c.key] || 0)));
         return `
-          <div class="rounded-2xl bg-white/[0.04] border border-white/[0.08] px-4 py-3 space-y-2 transition hover:border-white/15">
+          <div class="mr-9 sm:mr-0 rounded-2xl bg-white/[0.04] border border-white/[0.08] px-4 py-3 space-y-2 transition hover:border-white/15">
             <div class="flex justify-between text-sm tabular-nums">
               <span class="font-medium">${c.label}</span>
               <b id="cv-${c.key}" style="color:${c.color}">${Math.round(val)} / ${maxVal}</b>
@@ -1694,13 +1758,15 @@
         const emoji = cie.dataset.emoji;
         const form = cie.closest('[data-comment-form]');
         if (form) {
-          const input = form.querySelector('input[name="text"]');
+          const input = form.querySelector('[name="text"]');
           if (input) {
             const start = input.selectionStart ?? input.value.length;
             const end = input.selectionEnd ?? input.value.length;
             input.value = input.value.slice(0, start) + emoji + input.value.slice(end);
             input.focus();
             input.setSelectionRange(start + emoji.length, start + emoji.length);
+            input.style.height = 'auto';
+            input.style.height = Math.min(input.scrollHeight, 144) + 'px';
           }
           const box = form.querySelector('[data-comment-emoji-box]');
           if (box) box.classList.add('hidden');
@@ -1784,6 +1850,29 @@
         return;
       }
 
+      const rcm = e.target.closest('[data-reply-comment]');
+      if (rcm) {
+        const revId = rcm.dataset.revId;
+        replyingTo[revId] = {
+          id: rcm.dataset.replyComment,
+          author: rcm.dataset.replyAuthor,
+          text: rcm.dataset.replyText
+        };
+        updateCardComments(revId);
+        const visibleForm = Array.from(document.querySelectorAll(`[data-comment-form="${CSS.escape(revId)}"]`)).find(f => f.offsetParent !== null);
+        const ta = visibleForm && visibleForm.querySelector('[name="text"]');
+        if (ta) ta.focus();
+        return;
+      }
+
+      const crcm = e.target.closest('[data-cancel-reply]');
+      if (crcm) {
+        const revId = crcm.dataset.cancelReply;
+        delete replyingTo[revId];
+        updateCardComments(revId);
+        return;
+      }
+
       const dcm = e.target.closest('[data-del-comment]');
       if (dcm) {
         const cmId = dcm.dataset.delComment;
@@ -1855,18 +1944,79 @@
         return;
       }
     };
-    document.getElementById('app-shell').onsubmit = async e => {
+    // Auto-grow comment textarea so long comments are ALWAYS visible in full
+    document.getElementById('app-shell').addEventListener('input', e => {
+      if (e.target.matches('textarea.comment-autogrow')) {
+        e.target.style.height = 'auto';
+        e.target.style.height = Math.min(e.target.scrollHeight, 144) + 'px';
+      }
+    });
+
+    // Enter submits on desktop, Shift+Enter inserts newline
+    document.getElementById('app-shell').addEventListener('keydown', e => {
+      if (e.target.matches('textarea.comment-autogrow') && e.key === 'Enter' && !e.shiftKey && !isTouchDevice()) {
+        e.preventDefault();
+        const f = e.target.closest('form');
+        if (f) f.requestSubmit();
+      }
+    });
+
+    document.getElementById('app-shell').onsubmit = e => {
       const f = e.target.closest('[data-comment-form]');
       if (!f) return;
       e.preventDefault();
-      const text = f.querySelector('input[name="text"]').value.trim();
+      const field = f.querySelector('[name="text"]');
+      const text = (field && field.value || '').trim();
       if (!text) return;
       const revId = f.dataset.commentForm;
-      const r = await fetch(`/api/reviews/${revId}/comments`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ text }) });
-      reviews = (await r.json()).reviews;
-      openComments[revId] = true;
-      updateCardComments(revId);
-      showToast('Комментарий добавлен');
+      const reply = replyingTo[revId] || null;
+      const tempId = 'c_tmp_' + Date.now();
+
+      // Optimistic instant comment render (0 ms latency!)
+      const rev = reviews.find(x => x.id === revId);
+      if (rev) {
+        rev.comments.push({
+          id: tempId,
+          userId: currentUser.steam_id,
+          authorName: currentUser.name,
+          authorAvatar: currentUser.avatar || '/logo.jpg',
+          text,
+          replyToId: reply ? reply.id : null,
+          replyToAuthor: reply ? reply.author : null,
+          replyToText: reply ? reply.text : null,
+          createdAt: Date.now()
+        });
+        lastAddedCommentId = tempId;
+        delete replyingTo[revId];
+        openComments[revId] = true;
+        updateCardComments(revId);
+        setTimeout(() => { lastAddedCommentId = null; }, 350);
+      }
+
+      fetch(`/api/reviews/${revId}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text,
+          replyToId: reply ? reply.id : null,
+          replyToAuthor: reply ? reply.author : null,
+          replyToText: reply ? reply.text : null
+        })
+      }).then(r => r.ok ? r.json() : null).then(d => {
+        if (d && d.reviews) {
+          reviews = d.reviews;
+          // Quietly update comment IDs in DOM without re-animating
+          const visibleTa = Array.from(document.querySelectorAll(`[data-comment-form="${CSS.escape(revId)}"] [name="text"]`)).find(el => el.offsetParent !== null);
+          const draftText = visibleTa ? visibleTa.value : '';
+          updateCardComments(revId);
+          if (draftText) {
+            const nextTa = Array.from(document.querySelectorAll(`[data-comment-form="${CSS.escape(revId)}"] [name="text"]`)).find(el => el.offsetParent !== null);
+            if (nextTa) nextTa.value = draftText;
+          }
+        }
+      }).catch(() => {
+        showToast('Не удалось отправить комментарий');
+      });
     };
 
     function bindClearSearch(inputId, btnId, onClear) {
