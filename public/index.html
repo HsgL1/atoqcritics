@@ -1739,12 +1739,9 @@
       try {
         if (!routeHistoryPrimed) {
           routeHistoryPrimed = true;
-          // Sentinel guard on #home so Back / mobile swipe-back never closes the site even on Главная
-          history.replaceState({ atoq: true, guard: true, hash: '#home' }, '', '#home');
-          history.pushState({ atoq: true, hash: '#home' }, '', '#home');
-          if (hash !== '#home') {
-            history.pushState({ atoq: true, hash }, '', hash);
-          }
+          // Guard entry at the very bottom of history so Back / swipe-back never closes the site
+          history.replaceState({ atoq: true, guard: true, hash }, '', hash);
+          history.pushState({ atoq: true, hash }, '', hash);
         } else if (!isHandlingPopState && window.location.hash !== hash) {
           if (replaceOnly) {
             history.replaceState({ atoq: true, hash }, '', hash);
@@ -1778,9 +1775,9 @@
       }
     }
 
-    window.addEventListener('popstate', () => {
+    window.addEventListener('popstate', e => {
       if (!currentUser) return;
-      // 1. If a modal or notifications panel is open, close it first instead of leaving
+      // 1. If a modal or notifications panel is open, close it first
       const metaOpen = !document.getElementById('meta-modal').classList.contains('hidden');
       if (isScrollLocked || metaOpen || notifOpen) {
         if (isScrollLocked) closeModal();
@@ -1790,24 +1787,20 @@
         try { history.pushState({ atoq: true, hash: stayHash }, '', stayHash); } catch {}
         return;
       }
-      // 2. If on any non-Home tab (Лента, Игры, Профиль), browser Back / swipe-back returns to Главная
-      if (activeView !== 'home') {
-        isHandlingPopState = true;
-        activeView = 'home';
-        openEmojiPickerId = null;
-        try {
-          history.pushState({ atoq: true, hash: '#home' }, '', '#home');
-          localStorage.setItem('atoq_last_route', '#home');
-        } catch {}
-        renderApp(true);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        isHandlingPopState = false;
+      // 2. If we hit the bottom guard entry, stay on the current page without closing the site
+      if (e.state && e.state.guard) {
+        const stayHash = buildCurrentHash();
+        try { history.pushState({ atoq: true, hash: stayHash }, '', stayHash); } catch {}
         return;
       }
-      // 3. Already on Главная: re-push guard so Back / swipe-back does not close the site
-      try {
-        history.pushState({ atoq: true, hash: '#home' }, '', '#home');
-      } catch {}
+      // 3. Navigate cleanly to the actual previous page/tab/profile in history!
+      isHandlingPopState = true;
+      openEmojiPickerId = null;
+      restoreSavedRoute(window.location.hash || '#home');
+      try { localStorage.setItem('atoq_last_route', buildCurrentHash()); } catch {}
+      renderApp(true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      isHandlingPopState = false;
     });
 
     function renderApp(animateCards = false) {
