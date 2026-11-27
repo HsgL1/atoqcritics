@@ -393,7 +393,7 @@
         </div>
         <div class="liquid-glass rounded-[24px] p-3.5 flex flex-col md:flex-row gap-3">
           <div class="relative flex-1">
-            <input id="feed-search" type="text" placeholder="Поиск по играм и авторам..." class="w-full pl-4 pr-10 py-2.5 rounded-full bg-white/[0.06] border border-white/12 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#66c0f4] transition" />
+            <input id="feed-search" type="search" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search" placeholder="Поиск по играм и авторам..." class="w-full pl-4 pr-10 py-2.5 rounded-full bg-white/[0.06] border border-white/12 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#66c0f4] transition" />
             <button id="clear-feed-search" type="button" title="Очистить поиск" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white/10 hover:bg-white/20 text-xs text-slate-300 hover:text-white flex items-center justify-center transition cursor-pointer">✕</button>
           </div>
           <select id="feed-sort" class="px-4 py-2.5 rounded-full bg-[#141b29] border border-white/15 text-sm text-slate-200 cursor-pointer">
@@ -419,7 +419,7 @@
           <!-- Search & Sort -->
           <div class="flex flex-col md:flex-row gap-2.5">
             <div class="relative flex-1">
-              <input id="games-search" type="text" placeholder="Поиск игры по названию..." class="w-full pl-4 pr-10 py-2.5 rounded-full bg-white/[0.06] border border-white/12 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#66c0f4] transition" />
+              <input id="games-search" type="search" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search" placeholder="Поиск игры по названию..." class="w-full pl-4 pr-10 py-2.5 rounded-full bg-white/[0.06] border border-white/12 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#66c0f4] transition" />
               <button id="clear-games-search" type="button" title="Очистить поиск" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white/10 hover:bg-white/20 text-xs text-slate-300 hover:text-white flex items-center justify-center transition cursor-pointer">✕</button>
             </div>
             <select id="games-sort" class="px-4 py-2.5 rounded-full bg-[#141b29] border border-white/15 text-sm text-slate-200 cursor-pointer">
@@ -458,7 +458,7 @@
               <div class="flex flex-wrap items-center justify-between gap-2">
                 <span class="text-[11px] font-bold uppercase tracking-wider text-[#d9ff00]">Метки Steam</span>
                 <div class="relative w-full sm:w-56">
-                  <input id="games-tag-search" type="text" placeholder="Найти метку..." class="w-full pl-3 pr-8 py-1.5 rounded-full bg-white/[0.07] border border-white/12 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-[#d9ff00] transition" />
+                  <input id="games-tag-search" type="search" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Найти метку..." class="w-full pl-3 pr-8 py-1.5 rounded-full bg-white/[0.07] border border-white/12 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-[#d9ff00] transition" />
                   <button id="clear-games-tag-search" type="button" class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-slate-400 hover:text-white cursor-pointer">✕</button>
                 </div>
               </div>
@@ -488,7 +488,7 @@
         </div>
         <div class="liquid-glass rounded-[24px] p-3.5 flex flex-col md:flex-row gap-3">
           <div class="relative flex-1">
-            <input id="profile-search" type="text" placeholder="Поиск в профиле..." class="w-full pl-4 pr-10 py-2.5 rounded-full bg-white/[0.06] border border-white/12 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#66c0f4] transition" />
+            <input id="profile-search" type="search" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search" placeholder="Поиск в профиле..." class="w-full pl-4 pr-10 py-2.5 rounded-full bg-white/[0.06] border border-white/12 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#66c0f4] transition" />
             <button id="clear-profile-search" type="button" title="Очистить поиск" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white/10 hover:bg-white/20 text-xs text-slate-300 hover:text-white flex items-center justify-center transition cursor-pointer">✕</button>
           </div>
           <select id="profile-sort" class="px-4 py-2.5 rounded-full bg-[#141b29] border border-white/15 text-sm text-slate-200 cursor-pointer">
@@ -525,7 +525,7 @@
 
           <div id="steam-search-panel" class="space-y-3">
             <div class="relative">
-              <input id="steam-game-search" type="text" placeholder="Поиск игры в Steam..." class="w-full pl-4 pr-10 py-3 rounded-2xl bg-white/[0.07] border border-white/15 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#d9ff00] transition" />
+              <input id="steam-game-search" type="search" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search" placeholder="Поиск игры в Steam..." class="w-full pl-4 pr-10 py-3 rounded-2xl bg-white/[0.07] border border-white/15 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#d9ff00] transition" />
               <button id="clear-steam-search" type="button" title="Очистить поиск" class="hidden absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white/10 hover:bg-white/20 text-xs text-slate-300 hover:text-white flex items-center justify-center transition cursor-pointer">✕</button>
             </div>
             <div id="steam-search-status" class="text-xs text-slate-400"></div>
@@ -601,7 +601,7 @@
           </label>
           <div id="criteria-sliders-container" class="space-y-3"></div>
           <input id="input-hours" type="number" step="0.1" min="0" placeholder="Количество часов" class="w-full px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/15 text-sm text-white focus:outline-none focus:border-[#66c0f4] transition" />
-          <textarea id="input-review-text" rows="4" maxlength="2000" placeholder="Текст рецензии (необязательно)..." class="w-full px-4 py-3 rounded-2xl bg-white/[0.06] border border-white/15 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#d9ff00] transition"></textarea>
+          <textarea id="input-review-text" rows="4" autocomplete="off" maxlength="2000" placeholder="Текст рецензии (необязательно)..." class="w-full px-4 py-3 rounded-2xl bg-white/[0.06] border border-white/15 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#d9ff00] transition"></textarea>
           <div class="flex justify-end gap-2">
             <button id="btn-cancel-review" type="button" class="liquid-pill px-5 py-2.5 rounded-full text-sm cursor-pointer">Отмена</button>
             <button id="btn-publish-review" type="submit" class="btn-acid px-6 py-2.5 rounded-full text-sm cursor-pointer">Опубликовать</button>
@@ -828,7 +828,10 @@
       // Fetch Steam library in the background so it doesn't slow down opening the site
       loadMyLibrary();
       loadNotifications();
-      setInterval(() => { if (!document.hidden && currentUser) loadNotifications(); }, 30000);
+      connectNotificationStream();
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && currentUser) loadNotifications();
+      });
     }
 
     async function loadUsers() {
@@ -948,6 +951,37 @@
           </button>
         `;
       }).join('');
+    }
+
+    let notifEventSource = null;
+
+    function connectNotificationStream() {
+      if (notifEventSource || !window.EventSource) return;
+      try {
+        notifEventSource = new EventSource('/api/notifications/stream');
+        notifEventSource.onmessage = e => {
+          try {
+            const n = JSON.parse(e.data);
+            if (!n || !n.id) return;
+            if (!notifications.some(x => x.id === n.id)) {
+              notifications.unshift(n);
+              updateNotifBadge();
+              if (notifOpen) renderNotifPanel();
+              const label = n.type === 'comment'
+                ? `${n.actorName} прокомментировал «${n.gameTitle}»`
+                : n.type === 'reply'
+                  ? `${n.actorName} ответил на ваш комментарий`
+                  : `${n.actorName} поставил ${n.payload || 'реакцию'} на «${n.gameTitle}»`;
+              showToast('🔔 ' + label);
+            }
+          } catch {}
+        };
+        notifEventSource.onerror = () => {
+          try { notifEventSource.close(); } catch {}
+          notifEventSource = null;
+          setTimeout(() => { if (currentUser) connectNotificationStream(); }, 5000);
+        };
+      } catch {}
     }
 
     function toggleNotifPanel(forceState) {
@@ -1180,6 +1214,7 @@
             <textarea
               name="text"
               rows="1"
+              autocomplete="off"
               maxlength="800"
               required
               placeholder="${replyTarget ? 'Ваш ответ...' : 'Комментарий...'}"
@@ -3025,27 +3060,55 @@
       deferredInstallPrompt = e;
     });
 
-    // Telegram-style keyboard lift using VisualViewport API (iOS Safari, Android Chrome & PWA)
+    // True Telegram-style keyboard lift: lifts active input UP above keyboard and slides BACK DOWN when keyboard closes
     (function setupMobileKeyboardLift() {
       const root = document.documentElement;
-      let scrollTimer = null;
+      let baseViewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      let savedScrollBeforeKb = null;
+      let kbWasOpen = false;
+
+      function liftActiveField(el) {
+        if (!el || !isTouchDevice()) return;
+        if (el.closest('#review-modal') || el.closest('#meta-modal')) {
+          setTimeout(() => {
+            try { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch {}
+          }, 120);
+          return;
+        }
+        const vvH = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+        const rect = el.getBoundingClientRect();
+        // Keep the active input neatly ~28px above the top of the keyboard
+        const desiredBottom = vvH - 28;
+        if (rect.bottom > desiredBottom) {
+          const delta = rect.bottom - desiredBottom;
+          window.scrollBy({ top: delta, behavior: 'smooth' });
+        }
+      }
 
       function syncViewport() {
         const vv = window.visualViewport;
-        if (!vv) return;
-        const kb = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
-        root.style.setProperty('--kb-height', `${kb}px`);
-        root.style.setProperty('--vv-height', `${Math.round(vv.height)}px`);
+        const curH = vv ? vv.height : window.innerHeight;
+        if (curH > baseViewportHeight) baseViewportHeight = curH;
+        const kbFromWindow = vv ? Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)) : 0;
+        const kbFromBase = Math.max(0, Math.round(baseViewportHeight - curH));
+        const kb = Math.max(kbFromWindow, kbFromBase);
 
-        if (kb > 80) {
+        root.style.setProperty('--kb-height', `${kbFromWindow}px`);
+        root.style.setProperty('--vv-height', `${Math.round(curH)}px`);
+
+        const isOpenNow = kb > 110;
+        if (isOpenNow && !kbWasOpen) {
+          kbWasOpen = true;
           const active = document.activeElement;
           if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
-            clearTimeout(scrollTimer);
-            scrollTimer = setTimeout(() => {
-              try {
-                active.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              } catch {}
-            }, 90);
+            setTimeout(() => liftActiveField(active), 70);
+          }
+        } else if (!isOpenNow && kbWasOpen) {
+          kbWasOpen = false;
+          if (savedScrollBeforeKb !== null && !isScrollLocked) {
+            const targetY = savedScrollBeforeKb;
+            savedScrollBeforeKb = null;
+            window.scrollTo({ top: targetY, behavior: 'smooth' });
           }
         }
       }
@@ -3053,22 +3116,34 @@
       if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', syncViewport);
         window.visualViewport.addEventListener('scroll', syncViewport);
-        syncViewport();
       }
+      window.addEventListener('resize', syncViewport);
 
       document.addEventListener('focusin', e => {
+        if (!isTouchDevice()) return;
         if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
+          if (savedScrollBeforeKb === null && !isScrollLocked) {
+            savedScrollBeforeKb = window.scrollY || window.pageYOffset || 0;
+          }
           setTimeout(() => {
             syncViewport();
-            if (isTouchDevice()) {
-              try { e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch {}
-            }
-          }, 160);
+            liftActiveField(e.target);
+          }, 180);
         }
       });
 
       document.addEventListener('focusout', () => {
-        setTimeout(syncViewport, 120);
+        setTimeout(() => {
+          const active = document.activeElement;
+          const stillTyping = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA');
+          if (!stillTyping && savedScrollBeforeKb !== null && !isScrollLocked) {
+            const targetY = savedScrollBeforeKb;
+            savedScrollBeforeKb = null;
+            kbWasOpen = false;
+            window.scrollTo({ top: targetY, behavior: 'smooth' });
+          }
+          syncViewport();
+        }, 160);
       });
     })();
 
