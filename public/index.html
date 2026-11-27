@@ -1720,23 +1720,45 @@
       }).join('');
     }
 
-    function saveCurrentRoute() {
-      let hash = '#home';
-      if (activeView === 'feed') hash = '#feed';
-      else if (activeView === 'games') hash = gamesCatFilter !== 'all' ? `#games/${gamesCatFilter}` : '#games';
-      else if (activeView === 'profile') {
-        hash = (profileUserId && currentUser && profileUserId !== currentUser.steam_id)
+    let isHandlingPopState = false;
+    let routeHistoryPrimed = false;
+
+    function buildCurrentHash() {
+      if (activeView === 'feed') return '#feed';
+      if (activeView === 'games') return gamesCatFilter !== 'all' ? `#games/${gamesCatFilter}` : '#games';
+      if (activeView === 'profile') {
+        return (profileUserId && currentUser && profileUserId !== currentUser.steam_id)
           ? `#profile/${encodeURIComponent(profileUserId)}`
           : '#profile';
       }
+      return '#home';
+    }
+
+    function saveCurrentRoute(replaceOnly = false) {
+      const hash = buildCurrentHash();
       try {
-        if (window.location.hash !== hash) history.replaceState(null, '', hash);
+        if (!routeHistoryPrimed) {
+          routeHistoryPrimed = true;
+          if (hash !== '#home') {
+            // Prime #home underneath so browser Back / mobile swipe-back always lands on Главная instead of closing the site
+            history.replaceState({ atoq: true, hash: '#home' }, '', '#home');
+            history.pushState({ atoq: true, hash }, '', hash);
+          } else {
+            history.replaceState({ atoq: true, hash: '#home' }, '', '#home');
+          }
+        } else if (!isHandlingPopState && window.location.hash !== hash) {
+          if (replaceOnly || hash === '#home') {
+            history.replaceState({ atoq: true, hash }, '', hash);
+          } else {
+            history.pushState({ atoq: true, hash }, '', hash);
+          }
+        }
         localStorage.setItem('atoq_last_route', hash);
       } catch {}
     }
 
-    function restoreSavedRoute() {
-      let hash = window.location.hash || '';
+    function restoreSavedRoute(explicitHash) {
+      let hash = typeof explicitHash === 'string' ? explicitHash : (window.location.hash || '');
       if (!hash) {
         try { hash = localStorage.getItem('atoq_last_route') || ''; } catch {}
       }
@@ -1756,6 +1778,33 @@
         activeView = 'home';
       }
     }
+
+    window.addEventListener('popstate', () => {
+      if (!currentUser) return;
+      // 1. If a modal or notifications panel is open, close it first instead of leaving
+      const metaOpen = !document.getElementById('meta-modal').classList.contains('hidden');
+      if (isScrollLocked || metaOpen || notifOpen) {
+        if (isScrollLocked) closeModal();
+        if (metaOpen) closeMetaModal();
+        if (notifOpen) toggleNotifPanel(false);
+        const stayHash = buildCurrentHash();
+        try { history.pushState({ atoq: true, hash: stayHash }, '', stayHash); } catch {}
+        return;
+      }
+      // 2. If on any non-Home tab (Лента, Игры, Профиль), browser Back / swipe-back returns to Главная
+      if (activeView !== 'home') {
+        isHandlingPopState = true;
+        activeView = 'home';
+        openEmojiPickerId = null;
+        try {
+          history.replaceState({ atoq: true, hash: '#home' }, '', '#home');
+          localStorage.setItem('atoq_last_route', '#home');
+        } catch {}
+        renderApp(true);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        isHandlingPopState = false;
+      }
+    });
 
     function renderApp(animateCards = false) {
       saveCurrentRoute();
@@ -2342,7 +2391,7 @@
       const gcat = e.target.closest('[data-games-cat]');
       if (gcat) {
         gamesCatFilter = gcat.dataset.gamesCat || 'all';
-        saveCurrentRoute();
+        saveCurrentRoute(true);
         renderGamesCatalog(false);
         return;
       }
