@@ -667,33 +667,72 @@ const steamBrowseCache = new Map();
 
 app.get('/api/steam/browse', requireAuth, async (req, res) => {
   const page = Math.max(1, Math.min(50, Number(req.query.page) || 1));
-  const limit = Math.max(8, Math.min(24, Number(req.query.limit) || 16));
-  const cacheKey = `${page}:${limit}`;
+  const limit = Math.max(8, Math.min(25, Number(req.query.limit) || 16));
+  const cacheKey = `v2:${page}:${limit}`;
   const cached = steamBrowseCache.get(cacheKey);
   if (cached && (Date.now() - cached.ts) < 5 * 60 * 1000) {
     return res.json(cached.data);
   }
   try {
     const start = (page - 1) * limit;
-    const url = `https://store.steampowered.com/search/results/?query&start=${start}&count=${limit}&dynamic_data=&sort_by=_ASC&category1=998&l=russian&cc=KZ&json=1`;
-    const r = await fetchWithRetry(url, 2);
-    if (!r.ok) return res.status(502).json({ error: 'Ошибка загрузки каталога Steam' });
-    const data = await r.response.json();
-    const items = (data && data.items) || [];
-    const seen = new Set();
-    const games = [];
-    for (const item of items) {
-      const m = String(item.logo || '').match(/\/apps\/(\d+)\//);
-      const appId = m ? Number(m[1]) : 0;
-      if (!appId || seen.has(appId)) continue;
-      seen.add(appId);
-      games.push({
-        appId,
-        title: item.name || `Steam #${appId}`,
-        img: `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appId}/header.jpg`
-      });
+    let games = [];
+    let totalPages = 50;
+
+    // Primary: official Steam IStoreQueryService/Query/v1 (exact start/count pagination, zero bucketing)
+    try {
+      const qPayload = {
+        query: {
+          start,
+          count: limit,
+          sort: 10,
+          filters: { type_filters: { include_games: true } }
+        },
+        context: { language: 'russian', country_code: 'KZ', steam_realm: 1 },
+        data_request: { include_basic_info: true }
+      };
+      const apiUrl = `https://api.steampowered.com/IStoreQueryService/Query/v1/?input_json=${encodeURIComponent(JSON.stringify(qPayload))}`;
+      const r1 = await fetchWithRetry(apiUrl, 2);
+      if (r1.ok) {
+        const d1 = await r1.response.json();
+        const storeItems = (d1 && d1.response && d1.response.store_items) || [];
+        const seen = new Set();
+        for (const it of storeItems) {
+          const appId = Number(it.appid) || 0;
+          if (!appId || seen.has(appId)) continue;
+          seen.add(appId);
+          games.push({
+            appId,
+            title: it.name || `Steam #${appId}`,
+            img: `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appId}/header.jpg`
+          });
+        }
+        const totalCnt = Number(d1?.response?.metadata?.total_matching_records) || 0;
+        if (totalCnt > 0) totalPages = Math.min(50, Math.max(1, Math.ceil(totalCnt / limit)));
+      }
+    } catch {}
+
+    // Fallback: Steam search/results using native page= parameter (strictly distinct 25-item pages)
+    if (!games.length) {
+      const fbUrl = `https://store.steampowered.com/search/results/?query&page=${page}&dynamic_data=&sort_by=_ASC&category1=998&l=russian&cc=KZ&json=1`;
+      const r2 = await fetchWithRetry(fbUrl, 2);
+      if (!r2.ok) return res.status(502).json({ error: 'Ошибка загрузки каталога Steam' });
+      const d2 = await r2.response.json();
+      const items = (d2 && d2.items) || [];
+      const seen = new Set();
+      for (const item of items) {
+        const m = String(item.logo || '').match(/\/apps\/(\d+)\//);
+        const appId = m ? Number(m[1]) : 0;
+        if (!appId || seen.has(appId)) continue;
+        seen.add(appId);
+        games.push({
+          appId,
+          title: item.name || `Steam #${appId}`,
+          img: `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appId}/header.jpg`
+        });
+      }
     }
-    const payload = { games, page, totalPages: 50 };
+
+    const payload = { games, page, totalPages };
     steamBrowseCache.set(cacheKey, { ts: Date.now(), data: payload });
     res.json(payload);
   } catch (err) {
