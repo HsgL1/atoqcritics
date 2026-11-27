@@ -560,6 +560,18 @@ function pickBestTitleCandidate(queryTitle, list, getName, hasScoreFn) {
   return bestScore >= 0.72 ? best : null;
 }
 
+function extractSlugFromMcUrl(url) {
+  const m = String(url || '').match(/metacritic\.com\/game\/(?:(?:pc|playstation-[1-5]|xbox(?:-[a-z0-9]+)?|switch|wii-u|3ds|ios)\/)?([^/?#]+)/i);
+  return m ? m[1].replace(/-/g, ' ') : '';
+}
+
+function isMcUrlMatchingTitle(url, title) {
+  if (!url) return false;
+  const slugWords = extractSlugFromMcUrl(url);
+  if (!slugWords) return true;
+  return scoreTitleMatch(title, slugWords) >= 0.72;
+}
+
 function isTargetMcPlatform(entry) {
   const p = entry && entry.platform;
   const text = `${p?.slug || ''} ${p?.name || ''} ${entry?.url || ''}`.toLowerCase();
@@ -569,39 +581,65 @@ function isTargetMcPlatform(entry) {
     || text.includes('xbox');
 }
 
-async function fetchMetacriticPlatformReviewCount(mcUrl) {
-  if (!mcUrl) return null;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 4000);
-  try {
-    const res = await fetch(mcUrl, {
-      signal: controller.signal,
-      redirect: 'follow',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml'
+function toMetacriticPlatformSlug(platformObj, rawUrl) {
+  const txt = `${platformObj?.slug || ''} ${platformObj?.name || ''} ${rawUrl || ''}`.toLowerCase();
+  if (txt.includes('playstation5') || txt.includes('playstation-5') || txt.includes('playstation 5') || /ps5/.test(txt)) return 'playstation-5';
+  if (txt.includes('playstation4') || txt.includes('playstation-4') || txt.includes('playstation 4') || /ps4/.test(txt)) return 'playstation-4';
+  if (txt.includes('playstation3') || txt.includes('playstation-3') || txt.includes('playstation 3') || /ps3/.test(txt)) return 'playstation-3';
+  if (txt.includes('playstation2') || txt.includes('playstation-2') || txt.includes('playstation 2') || /ps2/.test(txt)) return 'playstation-2';
+  if (txt.includes('xbox-series') || txt.includes('xbox series')) return 'xbox-series-x';
+  if (txt.includes('xbox-one') || txt.includes('xbox one')) return 'xbox-one';
+  if (txt.includes('xbox360') || txt.includes('xbox-360') || txt.includes('xbox 360')) return 'xbox-360';
+  if (txt.includes('pc')) return 'pc';
+  return null;
+}
+
+async function fetchMetacriticPlatformReviewCount(gameSlug, platformSlug, fallbackUrl) {
+  const urls = [];
+  if (gameSlug && platformSlug) {
+    urls.push(`https://www.metacritic.com/game/${gameSlug}/critic-reviews/?platform=${platformSlug}`);
+  }
+  if (fallbackUrl && !urls.includes(fallbackUrl)) urls.push(fallbackUrl);
+
+  for (const url of urls) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4500);
+    try {
+      const res = await fetch(url, {
+        signal: controller.signal,
+        redirect: 'follow',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml'
+        }
+      });
+      clearTimeout(timer);
+      if (!res.ok) continue;
+      const html = await res.text();
+
+      // 1. Check explicit "Based on N Critic Reviews" or critic-reviews page count
+      const basedMatch = html.match(/Based on\s+(\d{1,4})\s+Critic Reviews?/i)
+        || html.match(/"reviewCount"\s*:\s*(\d{1,4})/i)
+        || html.match(/"totalResults"\s*:\s*(\d{1,4})/i);
+      if (basedMatch) {
+        const cnt = Number(basedMatch[1]);
+        if (Number.isFinite(cnt) && cnt > 0 && cnt < 5000) return cnt;
       }
-    });
-    clearTimeout(timer);
-    if (!res.ok) return null;
-    const html = await res.text();
-    const ldMatches = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) || [];
-    for (const block of ldMatches) {
-      const inner = block.replace(/^<script[^>]*>/i, '').replace(/<\/script>$/i, '').trim();
-      try {
-        const obj = JSON.parse(inner);
-        const ar = obj && obj.aggregateRating;
-        const cnt = Number(ar && (ar.reviewCount || ar.ratingCount));
-        if (Number.isFinite(cnt) && cnt > 0 && cnt < 10000) return Math.round(cnt);
-      } catch {}
+
+      // 2. Fallback: JSON-LD aggregateRating.reviewCount
+      const ldMatches = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) || [];
+      for (const block of ldMatches) {
+        const inner = block.replace(/^<script[^>]*>/i, '').replace(/<\/script>$/i, '').trim();
+        try {
+          const obj = JSON.parse(inner);
+          const ar = obj && obj.aggregateRating;
+          const cnt = Number(ar && (ar.reviewCount || ar.ratingCount));
+          if (Number.isFinite(cnt) && cnt > 0 && cnt < 5000) return Math.round(cnt);
+        } catch {}
+      }
+    } catch {
+      clearTimeout(timer);
     }
-    const m = html.match(/"reviewCount"\s*:\s*(\d{1,4})/) || html.match(/Based on\s+(\d{1,4})\s+Critic Reviews/i);
-    if (m) {
-      const cnt = Number(m[1]);
-      if (Number.isFinite(cnt) && cnt > 0) return cnt;
-    }
-  } catch {
-    clearTimeout(timer);
   }
   return null;
 }
@@ -625,34 +663,46 @@ async function fetchMetacriticFromRawg(gameTitle) {
     5000
   );
 
+  const gameSlug = slugifyGameTitle((detail && detail.name) || best.name || cleanQuery);
   const mcPlatforms = Array.isArray(detail && detail.metacritic_platforms) ? detail.metacritic_platforms : [];
   const targetPlatforms = mcPlatforms
     .filter(isTargetMcPlatform)
-    .map(x => ({ score: Number(x.metascore), url: x.url || '' }))
+    .map(x => ({
+      score: Number(x.metascore),
+      url: x.url || '',
+      mcPlat: toMetacriticPlatformSlug(x.platform, x.url)
+    }))
     .filter(x => Number.isFinite(x.score) && x.score > 0 && x.score <= 100);
 
   let finalScore = null;
   if (targetPlatforms.length === 1) {
     finalScore = Math.round(targetPlatforms[0].score);
   } else if (targetPlatforms.length > 1) {
-    // Weighted average by critic review count on each platform (PC + PlayStation + Xbox)
+    // Fetch real critic review count for each platform using modern Metacritic ?platform= URL
     const enriched = await Promise.all(targetPlatforms.slice(0, 5).map(async tp => {
-      const cnt = tp.url ? await fetchMetacriticPlatformReviewCount(tp.url) : null;
-      return { score: tp.score, count: cnt };
+      const cnt = await fetchMetacriticPlatformReviewCount(gameSlug, tp.mcPlat, tp.url);
+      return { score: tp.score, count: cnt, mcPlat: tp.mcPlat };
     }));
     const withCounts = enriched.filter(x => Number.isFinite(x.count) && x.count > 0);
-    if (withCounts.length >= 2) {
+    // Verify we didn't accidentally get the exact same lead-page count for all platforms due to redirect
+    const distinctCounts = new Set(withCounts.map(x => x.count));
+    if (withCounts.length >= 2 && (distinctCounts.size > 1 || withCounts.length === targetPlatforms.length)) {
       const totalWeight = withCounts.reduce((acc, x) => acc + x.count, 0);
       const weightedSum = withCounts.reduce((acc, x) => acc + (x.score * x.count), 0);
       finalScore = Math.round(weightedSum / totalWeight);
     } else if (withCounts.length === 1) {
-      // One platform has verified count; give unverified secondary platforms a modest fallback weight
-      const fallbackW = Math.max(4, Math.min(15, Math.round(withCounts[0].count * 0.2)));
+      const fallbackW = Math.max(4, Math.min(15, Math.round(withCounts[0].count * 0.15)));
       const totalWeight = enriched.reduce((acc, x) => acc + (x.count || fallbackW), 0);
       const weightedSum = enriched.reduce((acc, x) => acc + (x.score * (x.count || fallbackW)), 0);
       finalScore = Math.round(weightedSum / totalWeight);
     } else {
-      finalScore = Math.round(targetPlatforms.reduce((a, b) => a + b.score, 0) / targetPlatforms.length);
+      // If Metacritic HTML blocked reviewCount, prefer RAWG/Metacritic overall lead score (weighted by Metacritic) over naive 50/50 split!
+      const rawgOverall = Number((detail && detail.metacritic) || best.metacritic);
+      if (Number.isFinite(rawgOverall) && rawgOverall > 0 && rawgOverall <= 100) {
+        finalScore = Math.round(rawgOverall);
+      } else {
+        finalScore = Math.round(targetPlatforms.reduce((a, b) => a + b.score, 0) / targetPlatforms.length);
+      }
     }
   } else {
     const fallbackAll = mcPlatforms
@@ -669,8 +719,10 @@ async function fetchMetacriticFromRawg(gameTitle) {
   }
 
   if (finalScore === null) return null;
-  const slug = slugifyGameTitle((detail && detail.name) || best.name || cleanQuery);
-  const mcUrl = (detail && detail.metacritic_url) || (slug ? `https://www.metacritic.com/game/${slug}/` : null);
+  const rawMcUrl = (detail && detail.metacritic_url) || '';
+  const mcUrl = (rawMcUrl && isMcUrlMatchingTitle(rawMcUrl, gameTitle))
+    ? rawMcUrl
+    : (gameSlug ? `https://www.metacritic.com/game/${gameSlug}/` : null);
   return {
     score: Math.min(100, Math.max(0, finalScore)),
     url: mcUrl
@@ -678,9 +730,11 @@ async function fetchMetacriticFromRawg(gameTitle) {
 }
 
 async function fetchMetacriticFromWebJsonLd(gameTitle) {
+  const fullSlug = slugifyGameTitle(gameTitle);
+  const cleanSlug = slugifyGameTitle(cleanGameQueryTitle(gameTitle));
   const candidates = Array.from(new Set([
-    slugifyGameTitle(gameTitle),
-    slugifyGameTitle(cleanGameQueryTitle(gameTitle))
+    fullSlug,
+    cleanSlug
   ].filter(s => s && s.length >= 2)));
 
   for (const slug of candidates) {
@@ -799,7 +853,7 @@ async function fetchOpenCriticByTitle(gameTitle) {
   return null;
 }
 
-const MC_LOGIC_VERSION = 5;
+const MC_LOGIC_VERSION = 7;
 
 async function ensureExternalRatings(appId, gameTitle, force = false, opts = {}) {
   const numAppId = Number(appId) || 0;
@@ -838,8 +892,9 @@ async function ensureExternalRatings(appId, gameTitle, force = false, opts = {})
       needOc ? fetchOpenCriticByTitle(lookupTitle) : Promise.resolve(null)
     ]);
 
-    const finalMcScore = mc ? mc.score : (row ? row.mc_score : null);
-    const finalMcUrl = mc ? mc.url : (row ? row.mc_url : null);
+    const prevMcValid = row && (!row.mc_url || isMcUrlMatchingTitle(row.mc_url, lookupTitle));
+    const finalMcScore = mc ? mc.score : (prevMcValid ? row.mc_score : null);
+    const finalMcUrl = mc ? mc.url : (prevMcValid ? row.mc_url : null);
     const finalOcScore = oc ? oc.score : (row ? row.oc_score : null);
     const finalOcTier = oc ? oc.tier : (row ? row.oc_tier : null);
     const finalOcUrl = oc ? oc.url : (row ? row.oc_url : null);
@@ -1859,12 +1914,12 @@ app.post('/api/games/meta', requireAuth, async (req, res) => {
       const cleanOc = parseOptScore(ocScore);
       await pool.query(`
         INSERT INTO game_external_ratings (game_key, app_id, game_title, mc_score, oc_score, manual_override, mc_version, updated_at)
-        VALUES ($1, $2, $3, $4, $5, TRUE, 5, $6)
+        VALUES ($1, $2, $3, $4, $5, TRUE, 7, $6)
         ON CONFLICT (game_key) DO UPDATE SET
           mc_score = EXCLUDED.mc_score,
           oc_score = EXCLUDED.oc_score,
           manual_override = TRUE,
-          mc_version = 5,
+          mc_version = 7,
           updated_at = EXCLUDED.updated_at
       `, [gKey, numAppId, cleanTitle || gKey, cleanMc, cleanOc, Date.now()]);
     }
