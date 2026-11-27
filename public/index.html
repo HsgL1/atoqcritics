@@ -316,8 +316,7 @@
           <span id="notif-panel-count" class="text-[11px] text-slate-400"></span>
         </div>
         <div class="flex items-center gap-1.5">
-          <button id="btn-notif-read-all" type="button" class="text-[11px] font-medium text-[#7ccaf8] hover:text-[#d9ff00] px-2 py-1 rounded-full hover:bg-white/[0.08] transition cursor-pointer">Прочитать все</button>
-          <button id="btn-notif-clear" type="button" title="Очистить все" class="text-[11px] text-slate-400 hover:text-rose-400 px-2 py-1 rounded-full hover:bg-rose-500/10 transition cursor-pointer">Очистить</button>
+          <button id="btn-notif-clear" type="button" class="text-[11px] font-medium text-slate-300 hover:text-rose-400 px-2.5 py-1 rounded-full hover:bg-rose-500/10 transition cursor-pointer">Удалить уведомления</button>
         </div>
       </div>
 
@@ -688,7 +687,7 @@
       { key: 'audio', label: 'Аудио', color: '#a78bfa' },
       { key: 'emotions', label: 'Эмоции', color: '#fb923c' }
     ];
-    const EMOJI_PALETTE = ['🔥', '❤️', '😂', '🤯', '💯', '👑', '🐐', '💀', '🤡', '🤮', '😢', '⚡', '🎯', '🫡'];
+    const EMOJI_PALETTE = ['🔥', '❤️', '😂', '🤯', '💯', '👑', '🐐', '🗿', '💀', '🤡', '🤮', '💩', '😢', '⚡', '🎯', '🫡'];
 
     let currentUser = null, users = [], reviews = [], myLibrary = [], libraryPrivate = false, libraryError = '';
     let notifications = [], notifFilter = 'all', notifOpen = false;
@@ -1016,7 +1015,14 @@
       if (panel) panel.classList.toggle('hidden', !notifOpen);
       if (notifOpen) {
         renderNotifPanel();
-        loadNotifications();
+        const hadUnread = notifications.some(n => !n.isRead);
+        if (hadUnread) {
+          notifications.forEach(n => { n.isRead = true; });
+          updateNotifBadge();
+          fetch('/api/notifications/read', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(() => {});
+        } else {
+          loadNotifications();
+        }
       }
     }
 
@@ -1158,7 +1164,7 @@
                 <span class="text-sm font-bold leading-none">+</span>
               </button>
               ${pickerOpen ? `
-                <div class="anim-popover absolute left-0 right-0 sm:right-auto bottom-full mb-2 z-30 liquid-glass-strong rounded-2xl p-2 sm:p-2.5 grid grid-cols-7 gap-1 sm:gap-1.5 sm:w-max justify-items-center shadow-2xl">
+                <div class="anim-popover absolute left-0 right-0 sm:right-auto bottom-full mb-2 z-30 liquid-glass-strong rounded-2xl p-2 sm:p-2.5 grid grid-cols-8 gap-1 sm:gap-1.5 sm:w-max justify-items-center shadow-2xl">
                   ${EMOJI_PALETTE.map(em => {
                     const chosen = Array.isArray(reactions[em]) && reactions[em].includes(currentUser.steam_id);
                     return `<button type="button" data-react-review="${esc(rev.id)}" data-emoji="${em}" data-from-picker="1" class="emoji-btn w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-xl cursor-pointer ${chosen ? 'bg-[#d9ff00]/20 ring-1 ring-[#d9ff00]/60' : ''}">${em}</button>`;
@@ -1233,7 +1239,7 @@
           <form data-comment-form="${esc(rev.id)}" class="flex items-end gap-2 relative w-full">
             <div class="sm:relative shrink-0 pb-0.5">
               <button type="button" data-toggle-comment-emoji="${esc(rev.id)}" title="Вставить эмодзи" class="liquid-pill w-9 h-9 rounded-full flex items-center justify-center text-lg cursor-pointer">😀</button>
-              <div data-comment-emoji-box="${esc(rev.id)}" class="hidden anim-popover absolute left-0 right-0 sm:right-auto bottom-full mb-2 z-30 liquid-glass-strong rounded-2xl p-2 grid grid-cols-7 gap-1 sm:w-max justify-items-center shadow-2xl">
+              <div data-comment-emoji-box="${esc(rev.id)}" class="hidden anim-popover absolute left-0 right-0 sm:right-auto bottom-full mb-2 z-30 liquid-glass-strong rounded-2xl p-2 grid grid-cols-8 gap-1 sm:w-max justify-items-center shadow-2xl">
                 ${EMOJI_PALETTE.map(em => `<button type="button" data-insert-comment-emoji="${esc(rev.id)}" data-emoji="${em}" class="emoji-btn w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-lg cursor-pointer">${em}</button>`).join('')}
               </div>
             </div>
@@ -2928,12 +2934,7 @@
       toggleNotifPanel();
     };
 
-    document.getElementById('btn-notif-read-all').onclick = () => {
-      notifications.forEach(n => { n.isRead = true; });
-      updateNotifBadge();
-      renderNotifPanel();
-      fetch('/api/notifications/read', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(() => {});
-    };
+
 
     document.getElementById('btn-notif-clear').onclick = () => {
       notifications = [];
