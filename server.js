@@ -663,6 +663,44 @@ app.get('/api/steam/poster/:appId', async (req, res) => {
   return res.status(404).end();
 });
 
+const steamBrowseCache = new Map();
+
+app.get('/api/steam/browse', requireAuth, async (req, res) => {
+  const page = Math.max(1, Math.min(50, Number(req.query.page) || 1));
+  const limit = Math.max(8, Math.min(24, Number(req.query.limit) || 16));
+  const cacheKey = `${page}:${limit}`;
+  const cached = steamBrowseCache.get(cacheKey);
+  if (cached && (Date.now() - cached.ts) < 5 * 60 * 1000) {
+    return res.json(cached.data);
+  }
+  try {
+    const start = (page - 1) * limit;
+    const url = `https://store.steampowered.com/search/results/?query&start=${start}&count=${limit}&dynamic_data=&sort_by=_ASC&category1=998&l=russian&cc=KZ&json=1`;
+    const r = await fetchWithRetry(url, 2);
+    if (!r.ok) return res.status(502).json({ error: 'Ошибка загрузки каталога Steam' });
+    const data = await r.response.json();
+    const items = (data && data.items) || [];
+    const seen = new Set();
+    const games = [];
+    for (const item of items) {
+      const m = String(item.logo || '').match(/\/apps\/(\d+)\//);
+      const appId = m ? Number(m[1]) : 0;
+      if (!appId || seen.has(appId)) continue;
+      seen.add(appId);
+      games.push({
+        appId,
+        title: item.name || `Steam #${appId}`,
+        img: `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appId}/header.jpg`
+      });
+    }
+    const payload = { games, page, totalPages: 50 };
+    steamBrowseCache.set(cacheKey, { ts: Date.now(), data: payload });
+    res.json(payload);
+  } catch (err) {
+    res.status(500).json({ error: 'Ошибка соединения со Steam' });
+  }
+});
+
 app.get('/api/steam/search', requireAuth, async (req, res) => {
   const term = String(req.query.q || '').trim();
   if (term.length < 2) return res.json({ games: [] });
