@@ -934,7 +934,7 @@ async function createNotification({ recipientSteamId, actorSteamId, type, review
   }
 }
 
-const ALLOWED_EMOJIS = ['🔥', '❤️', '😂', '🤯', '💯', '👑', '🐐', '💀', '🤡', '🤮', '😢', '⚡', '🎯', '🫡'];
+const ALLOWED_EMOJIS = ['🔥', '❤️', '😂', '🤯', '💯', '👑', '🐐', '🗿', '💀', '🤡', '🤮', '💩', '😢', '⚡', '🎯', '🫡'];
 
 app.post('/api/reviews/:id/react', requireAuth, async (req, res) => {
   try {
