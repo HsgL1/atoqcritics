@@ -759,9 +759,9 @@ app.post('/api/reviews', requireAuth, async (req, res) => {
     if ((appId === undefined || appId === null || appId === '') || !gameTitle || !scores) {
       return res.status(400).json({ error: 'Заполните все обязательные поля обзора' });
     }
-    const numAppIdCheck = Number(appId) || 0;
-    const dupRes = numAppIdCheck > 0
-      ? await pool.query('SELECT id FROM reviews WHERE user_steam_id = $1 AND app_id = $2 LIMIT 1', [req.user.steam_id, numAppIdCheck])
+    const numAppId = Number(appId) || 0;
+    const dupRes = numAppId > 0
+      ? await pool.query('SELECT id FROM reviews WHERE user_steam_id = $1 AND app_id = $2 LIMIT 1', [req.user.steam_id, numAppId])
       : await pool.query('SELECT id FROM reviews WHERE user_steam_id = $1 AND app_id = 0 AND LOWER(TRIM(game_title)) = LOWER(TRIM($2)) LIMIT 1', [req.user.steam_id, String(gameTitle)]);
     if (dupRes.rows[0]) {
       return res.status(409).json({ error: 'Вы уже оценили эту игру. Отредактируйте существующий обзор.' });
@@ -778,15 +778,9 @@ app.post('/api/reviews', requireAuth, async (req, res) => {
     const total = g + v + n + a + e;
     const id = 'rev_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
 
-    const numAppId = Number(appId) || 0;
-    const [ach] = await Promise.all([
-      numAppId > 0 ? fetchSteamAchievements(req.user.steam_id, numAppId) : Promise.resolve(null),
-      numAppId > 0 ? ensureGameTags(numAppId) : Promise.resolve([])
-    ]);
-
     await pool.query(`
       INSERT INTO reviews (id, user_steam_id, app_id, game_title, game_img, gameplay, visuals, narrative, audio, emotions, total, no_narrative, hours_played, ach_unlocked, ach_total, text, created_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NULL, NULL, $14, $15)
     `, [
       id,
       req.user.steam_id,
@@ -796,40 +790,22 @@ app.post('/api/reviews', requireAuth, async (req, res) => {
       g, v, n, a, e, total,
       skipNar,
       hoursPlayed !== null && hoursPlayed !== '' && !Number.isNaN(Number(hoursPlayed)) ? Number(hoursPlayed) : null,
-      ach ? ach.unlocked : null,
-      ach ? ach.total : null,
       String(text || '').trim().slice(0, 2000),
       Date.now()
     ]);
 
-    const revInfo = await pool.query('SELECT user_steam_id, game_title FROM reviews WHERE id = $1', [req.params.id]);
-    const revRow = revInfo.rows[0];
-    let parentAuthorId = null;
-    if (replyToId) {
-      const parentRes = await pool.query('SELECT user_steam_id FROM comments WHERE id = $1', [replyToId]);
-      parentAuthorId = parentRes.rows[0] ? parentRes.rows[0].user_steam_id : null;
-      if (parentAuthorId && parentAuthorId !== req.user.steam_id) {
-        await createNotification({
-          recipientSteamId: parentAuthorId,
-          actorSteamId: req.user.steam_id,
-          type: 'reply',
-          reviewId: req.params.id,
-          gameTitle: revRow ? revRow.game_title : '',
-          payload: text.slice(0, 140)
-        });
-      }
-    }
-    if (revRow && revRow.user_steam_id !== req.user.steam_id && revRow.user_steam_id !== parentAuthorId) {
-      await createNotification({
-        recipientSteamId: revRow.user_steam_id,
-        actorSteamId: req.user.steam_id,
-        type: 'comment',
-        reviewId: req.params.id,
-        gameTitle: revRow.game_title,
-        payload: text.slice(0, 140)
-      });
-    }
     res.status(201).json({ id, reviews: await hydrateReviews() });
+
+    // Fetch Steam achievements & Steam tags in background so review modal closes immediately!
+    if (numAppId > 0) {
+      const uid = req.user.steam_id;
+      Promise.all([
+        fetchSteamAchievements(uid, numAppId).then(ach => {
+          if (ach) return pool.query('UPDATE reviews SET ach_unlocked = $1, ach_total = $2 WHERE id = $3', [ach.unlocked, ach.total, id]);
+        }).catch(() => {}),
+        ensureGameTags(numAppId).catch(() => {})
+      ]).catch(() => {});
+    }
   } catch (err) {
     res.status(500).json({ error: 'Ошибка сохранения обзора' });
   }
@@ -916,23 +892,43 @@ app.post('/api/reviews/:id/vote', requireAuth, async (req, res) => {
   }
 });
 
+const notifClients = new Map();
+
+function pushRealtimeNotification(recipientSteamId, notifObj) {
+  const set = notifClients.get(recipientSteamId);
+  if (!set || set.size === 0) return;
+  const msg = `data: ${JSON.stringify(notifObj)}\n\n`;
+  for (const res of set) {
+    try { res.write(msg); } catch {}
+  }
+}
+
 async function createNotification({ recipientSteamId, actorSteamId, type, reviewId, gameTitle, payload }) {
   if (!recipientSteamId || !actorSteamId || recipientSteamId === actorSteamId) return;
   const id = 'n_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+  const createdAt = Date.now();
+  const cleanTitle = String(gameTitle || '').slice(0, 150);
+  const cleanPayload = String(payload || '').slice(0, 180);
   try {
     await pool.query(`
       INSERT INTO notifications (id, recipient_steam_id, actor_steam_id, type, review_id, game_title, payload, is_read, created_at)
       VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, $8)
-    `, [
+    `, [id, recipientSteamId, actorSteamId, type, reviewId || null, cleanTitle, cleanPayload, createdAt]);
+
+    const actorRes = await pool.query('SELECT name, avatar FROM users WHERE steam_id = $1', [actorSteamId]);
+    const actor = actorRes.rows[0] || {};
+    pushRealtimeNotification(recipientSteamId, {
       id,
-      recipientSteamId,
-      actorSteamId,
       type,
-      reviewId || null,
-      String(gameTitle || '').slice(0, 150),
-      String(payload || '').slice(0, 180),
-      Date.now()
-    ]);
+      reviewId: reviewId || null,
+      gameTitle: cleanTitle,
+      payload: cleanPayload,
+      isRead: false,
+      createdAt,
+      actorId: actorSteamId,
+      actorName: actor.name || 'Пользователь',
+      actorAvatar: actor.avatar || ''
+    });
   } catch (err) {
     console.warn('Notification insert error:', err.message);
   }
@@ -989,10 +985,49 @@ app.post('/api/reviews/:id/comments', requireAuth, async (req, res) => {
     const replyToId = body.replyToId ? String(body.replyToId).slice(0, 80) : null;
     const replyToAuthor = body.replyToAuthor ? String(body.replyToAuthor).slice(0, 80) : null;
     const replyToText = body.replyToText ? String(body.replyToText).slice(0, 140) : null;
+
     await pool.query(`
       INSERT INTO comments (id, review_id, user_steam_id, text, reply_to_id, reply_to_author, reply_to_text, created_at)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     `, [id, req.params.id, req.user.steam_id, text.slice(0, 800), replyToId, replyToAuthor, replyToText, Date.now()]);
+
+    // Trigger real-time notifications for reply & review comment
+    const revInfo = await pool.query('SELECT user_steam_id, game_title FROM reviews WHERE id = $1', [req.params.id]);
+    const revRow = revInfo.rows[0];
+    let parentAuthorId = null;
+
+    if (replyToId || replyToAuthor) {
+      if (replyToId) {
+        const parentRes = await pool.query('SELECT user_steam_id FROM comments WHERE id = $1', [replyToId]);
+        parentAuthorId = parentRes.rows[0] ? parentRes.rows[0].user_steam_id : null;
+      }
+      if (!parentAuthorId && replyToAuthor) {
+        const byName = await pool.query('SELECT steam_id FROM users WHERE name = $1 LIMIT 1', [replyToAuthor]);
+        parentAuthorId = byName.rows[0] ? byName.rows[0].steam_id : null;
+      }
+      if (parentAuthorId && parentAuthorId !== req.user.steam_id) {
+        await createNotification({
+          recipientSteamId: parentAuthorId,
+          actorSteamId: req.user.steam_id,
+          type: 'reply',
+          reviewId: req.params.id,
+          gameTitle: revRow ? revRow.game_title : '',
+          payload: text.slice(0, 140)
+        });
+      }
+    }
+
+    if (revRow && revRow.user_steam_id !== req.user.steam_id && revRow.user_steam_id !== parentAuthorId) {
+      await createNotification({
+        recipientSteamId: revRow.user_steam_id,
+        actorSteamId: req.user.steam_id,
+        type: 'comment',
+        reviewId: req.params.id,
+        gameTitle: revRow.game_title,
+        payload: text.slice(0, 140)
+      });
+    }
+
     res.status(201).json({ id, reviews: await hydrateReviews() });
   } catch (err) {
     res.status(500).json({ error: 'Ошибка добавления комментария' });
@@ -1009,6 +1044,33 @@ app.delete('/api/comments/:id', requireAuth, async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Ошибка удаления комментария' });
   }
+});
+
+app.get('/api/notifications/stream', requireAuth, (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  if (typeof res.flushHeaders === 'function') res.flushHeaders();
+  res.write(': connected\n\n');
+
+  const sid = req.user.steam_id;
+  let set = notifClients.get(sid);
+  if (!set) {
+    set = new Set();
+    notifClients.set(sid, set);
+  }
+  set.add(res);
+
+  const keepAlive = setInterval(() => {
+    try { res.write(': ping\n\n'); } catch {}
+  }, 25000);
+
+  req.on('close', () => {
+    clearInterval(keepAlive);
+    set.delete(res);
+    if (set.size === 0) notifClients.delete(sid);
+  });
 });
 
 app.get('/api/notifications', requireAuth, async (req, res) => {
