@@ -257,6 +257,54 @@
     .plist-swap-pop {
       animation: plistSwapPop 0.22s cubic-bezier(0.22, 1, 0.36, 1);
     }
+
+    @keyframes bootLogoIn {
+      0% { opacity: 0; transform: scale(0.84) translateY(8px); }
+      100% { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    @keyframes bootRingSpin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    @keyframes bootPulseGlow {
+      0%, 100% { opacity: 0.45; transform: scale(0.96); }
+      50% { opacity: 0.85; transform: scale(1.06); }
+    }
+    .boot-stage-in {
+      animation: bootLogoIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+    .boot-ring-smooth {
+      background: conic-gradient(from 0deg, transparent 0deg, transparent 150deg, #66c0f4 255deg, #d9ff00 345deg, transparent 360deg);
+      -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 1.5px));
+      mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 1.5px));
+      animation: bootRingSpin 1.15s linear infinite;
+    }
+    .boot-ambient-glow {
+      animation: bootPulseGlow 2.2s ease-in-out infinite;
+    }
+    #boot-loader {
+      transition: opacity 0.36s cubic-bezier(0.22, 1, 0.36, 1), transform 0.36s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    #boot-loader.boot-loader-out {
+      opacity: 0;
+      transform: scale(1.035);
+      pointer-events: none;
+    }
+    .notif-sheet-clean {
+      background: linear-gradient(155deg, rgba(20, 27, 41, 0.96), rgba(11, 15, 24, 0.98));
+      backdrop-filter: blur(28px) saturate(170%);
+      -webkit-backdrop-filter: blur(28px) saturate(170%);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.72);
+    }
+    #mobile-bottom-nav {
+      transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease;
+    }
+    body.kb-open #mobile-bottom-nav {
+      opacity: 0;
+      transform: translateY(130%);
+      pointer-events: none;
+    }
   </style>
 </head>
 <body>
@@ -264,14 +312,20 @@
   <div id="toast-container" class="fixed bottom-5 left-3 right-3 sm:left-auto sm:right-5 z-50 flex flex-col items-center sm:items-end gap-2 pointer-events-none"></div>
 
   <!-- INITIAL SPLASH LOADER -->
-  <div id="boot-loader" class="relative z-30 min-h-screen flex flex-col items-center justify-center gap-4 p-4">
-    <div class="relative">
-      <div class="w-16 h-16 rounded-2xl overflow-hidden border border-white/20 shadow-2xl">
-        <img src="/logo.jpg" alt="AToQcritics" class="w-full h-full object-cover" />
+  <div id="boot-loader" class="fixed inset-0 z-50 flex flex-col items-center justify-center gap-5 p-4 bg-[#090c12]">
+    <div class="boot-stage-in flex flex-col items-center gap-4">
+      <div class="relative w-24 h-24 flex items-center justify-center">
+        <div class="boot-ambient-glow absolute inset-1 rounded-full bg-gradient-to-tr from-[#66c0f4]/30 to-[#d9ff00]/30 blur-xl pointer-events-none"></div>
+        <div class="boot-ring-smooth absolute inset-0 rounded-full pointer-events-none"></div>
+        <div class="relative w-[74px] h-[74px] rounded-[22px] overflow-hidden border border-white/20 shadow-2xl bg-[#0e1420]">
+          <img src="/logo.jpg" alt="AToQcritics" class="w-full h-full object-cover" />
+        </div>
       </div>
-      <div class="absolute -inset-2 rounded-[22px] border-2 border-transparent border-t-[#66c0f4] border-r-[#d9ff00] animate-spin"></div>
+      <div class="flex flex-col items-center gap-1">
+        <span class="text-lg font-black italic tracking-tight atoq-wordmark">AToQcritics</span>
+        <span class="text-[11px] text-slate-400 tracking-wide animate-pulse">Загрузка...</span>
+      </div>
     </div>
-    <div class="text-xs text-slate-400 tracking-wide">Загрузка AToQcritics...</div>
   </div>
 
   <!-- REAL STEAM AUTH SCREEN -->
@@ -309,36 +363,45 @@
         </nav>
         <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button id="btn-new-review" type="button" class="btn-acid px-3.5 sm:px-4 py-2 rounded-full text-xs sm:text-sm cursor-pointer">+ <span class="hidden sm:inline">Новый </span>обзор</button>
-          <button id="btn-notifications" type="button" title="Уведомления" aria-label="Уведомления" class="liquid-pill p-2 rounded-full text-slate-200 hover:text-white relative cursor-pointer">
+          <button id="btn-notifications" type="button" title="Уведомления" aria-label="Уведомления" class="hidden sm:inline-flex liquid-pill p-2 rounded-full text-slate-200 hover:text-white relative cursor-pointer items-center justify-center">
             <i data-lucide="bell" class="w-4 h-4"></i>
             <span id="notif-badge" class="hidden absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#d9ff00] text-[#090c12] text-[10px] font-black flex items-center justify-center shadow-[0_0_12px_rgba(217,255,0,0.65)]">0</span>
           </button>
         </div>
       </div>
-
-      <!-- Mobile Sticky Top Tabs -->
-      <nav class="pointer-events-auto sm:hidden max-w-6xl mx-auto liquid-glass rounded-full p-1 grid grid-cols-4 gap-1" aria-label="Мобильная навигация">
-        <button id="mnav-home" type="button" class="liquid-pill py-2 px-1 rounded-full text-[11px] font-semibold flex items-center justify-center gap-1 cursor-pointer">
-          <i data-lucide="bar-chart-3" class="w-3.5 h-3.5 shrink-0"></i>
-          <span class="truncate">Главная</span>
-        </button>
-        <button id="mnav-feed" type="button" class="liquid-pill py-2 px-1 rounded-full text-[11px] font-semibold flex items-center justify-center gap-1 cursor-pointer">
-          <i data-lucide="flame" class="w-3.5 h-3.5 shrink-0"></i>
-          <span class="truncate">Лента</span>
-        </button>
-        <button id="mnav-games" type="button" class="liquid-pill py-2 px-1 rounded-full text-[11px] font-semibold flex items-center justify-center gap-1 cursor-pointer">
-          <i data-lucide="gamepad-2" class="w-3.5 h-3.5 shrink-0"></i>
-          <span class="truncate">Игры</span>
-        </button>
-        <button id="mnav-profile" type="button" class="liquid-pill py-2 px-1 rounded-full text-[11px] font-semibold flex items-center justify-center gap-1 cursor-pointer">
-          <i data-lucide="user" class="w-3.5 h-3.5 shrink-0"></i>
-          <span class="truncate">Профиль</span>
-        </button>
-      </nav>
     </header>
 
-    <!-- NOTIFICATIONS LIQUID-GLASS PANEL (Desktop Popover + Mobile Drop Sheet) -->
-    <div id="notif-panel" class="hidden fixed inset-x-3 sm:inset-x-auto sm:right-6 top-[72px] sm:top-[76px] sm:w-[400px] z-40 liquid-glass-strong anim-popover rounded-[26px] overflow-hidden shadow-2xl border border-white/15">
+    <!-- Mobile Fixed Bottom Dock (Smartphone Only) -->
+    <div id="mobile-bottom-nav" class="sm:hidden fixed bottom-0 inset-x-0 z-30 px-3 pb-[max(0.65rem,env(safe-area-inset-bottom))] pt-2 pointer-events-none">
+      <nav class="pointer-events-auto max-w-md mx-auto liquid-glass-strong rounded-full p-1.5 grid grid-cols-5 gap-1 shadow-[0_14px_40px_rgba(0,0,0,0.65)]" aria-label="Мобильная навигация">
+        <button id="mnav-home" type="button" class="liquid-pill py-1.5 px-1 rounded-full text-[10px] font-semibold flex flex-col items-center justify-center gap-0.5 cursor-pointer">
+          <i data-lucide="bar-chart-3" class="w-4 h-4 shrink-0"></i>
+          <span class="truncate max-w-full leading-none">Главная</span>
+        </button>
+        <button id="mnav-feed" type="button" class="liquid-pill py-1.5 px-1 rounded-full text-[10px] font-semibold flex flex-col items-center justify-center gap-0.5 cursor-pointer">
+          <i data-lucide="flame" class="w-4 h-4 shrink-0"></i>
+          <span class="truncate max-w-full leading-none">Лента</span>
+        </button>
+        <button id="mnav-games" type="button" class="liquid-pill py-1.5 px-1 rounded-full text-[10px] font-semibold flex flex-col items-center justify-center gap-0.5 cursor-pointer">
+          <i data-lucide="gamepad-2" class="w-4 h-4 shrink-0"></i>
+          <span class="truncate max-w-full leading-none">Игры</span>
+        </button>
+        <button id="mnav-profile" type="button" class="liquid-pill py-1.5 px-1 rounded-full text-[10px] font-semibold flex flex-col items-center justify-center gap-0.5 cursor-pointer">
+          <i data-lucide="user" class="w-4 h-4 shrink-0"></i>
+          <span class="truncate max-w-full leading-none">Профиль</span>
+        </button>
+        <button id="mnav-notif" type="button" aria-label="Уведомления" class="liquid-pill py-1.5 px-1 rounded-full text-[10px] font-semibold flex flex-col items-center justify-center gap-0.5 relative cursor-pointer">
+          <span class="relative inline-flex">
+            <i data-lucide="bell" class="w-4 h-4 shrink-0"></i>
+            <span id="mnav-notif-badge" class="hidden absolute -top-1.5 -right-2 min-w-[16px] h-[16px] px-1 rounded-full bg-[#d9ff00] text-[#090c12] text-[9px] font-black flex items-center justify-center shadow-[0_0_10px_rgba(217,255,0,0.65)]">0</span>
+          </span>
+          <span class="truncate max-w-full leading-none">Уведом.</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- NOTIFICATIONS LIQUID-GLASS PANEL (Desktop Top-Right Popover + Mobile Bottom Sheet) -->
+    <div id="notif-panel" class="hidden fixed inset-x-3 bottom-[84px] sm:bottom-auto sm:inset-x-auto sm:right-6 sm:top-[76px] sm:w-[400px] z-40 notif-sheet-clean anim-popover rounded-[26px] overflow-hidden">
       <div class="px-4 py-3.5 border-b border-white/10 flex items-center justify-between gap-2">
         <div class="flex items-center gap-2">
           <i data-lucide="bell" class="w-4 h-4 text-[#d9ff00]"></i>
@@ -361,7 +424,7 @@
       <div id="notif-list" class="max-h-[62dvh] sm:max-h-[420px] overflow-y-auto overscroll-contain p-2.5 space-y-2"></div>
     </div>
 
-    <main class="flex-1 w-full max-w-6xl mx-auto px-3 sm:px-6 pt-[124px] sm:pt-[86px] pb-12 sm:pb-16">
+    <main class="flex-1 w-full max-w-6xl mx-auto px-3 sm:px-6 pt-[76px] sm:pt-[86px] pb-28 sm:pb-16">
       <section id="view-home" class="space-y-5 anim-view">
         <!-- Hero KPI Summary Row -->
         <div id="home-kpi-row" class="grid grid-cols-2 lg:grid-cols-4 gap-3.5"></div>
@@ -392,6 +455,9 @@
                   <p class="text-xs text-slate-400">Лучшие игры по среднему баллу сайта</p>
                 </div>
               </div>
+              <button type="button" data-open-games-top="best" class="liquid-pill px-3 py-1.5 rounded-full text-[11px] font-semibold text-[#d9ff00] flex items-center gap-1 cursor-pointer shrink-0">
+                <span>Весь топ</span><i data-lucide="arrow-right" class="w-3 h-3"></i>
+              </button>
             </div>
             <div id="home-top-best" class="space-y-2.5"></div>
           </div>
@@ -405,6 +471,9 @@
                   <p class="text-xs text-slate-400">Игры с самым низким средним баллом</p>
                 </div>
               </div>
+              <button type="button" data-open-games-top="worst" class="liquid-pill px-3 py-1.5 rounded-full text-[11px] font-semibold text-rose-400 flex items-center gap-1 cursor-pointer shrink-0">
+                <span>Весь топ</span><i data-lucide="arrow-right" class="w-3 h-3"></i>
+              </button>
             </div>
             <div id="home-top-worst" class="space-y-2.5"></div>
           </div>
@@ -447,12 +516,24 @@
 
       <section id="view-games" class="hidden space-y-4 anim-view">
         <div class="liquid-glass rounded-[26px] p-4 sm:p-5 space-y-4">
-          <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
               <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#d9ff00]/15 text-[#d9ff00] border border-[#d9ff00]/35">Каталог сообщества</span>
-              <h2 class="text-xl sm:text-2xl font-bold mt-1">Все оценённые игры</h2>
+              <h2 id="games-view-title" class="text-xl sm:text-2xl font-bold mt-1">Топ лучших игр</h2>
             </div>
             <span id="games-count-badge" class="text-xs text-slate-400"></span>
+          </div>
+
+          <!-- Games Sub-Tabs: Топ лучших / Топ худших -->
+          <div id="games-subtabs" class="liquid-glass rounded-full p-1 grid grid-cols-2 gap-1 sm:inline-grid sm:w-auto">
+            <button type="button" data-games-tab="best" class="liquid-pill liquid-pill-active px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 cursor-pointer">
+              <span>🏆</span>
+              <span>Топ лучших</span>
+            </button>
+            <button type="button" data-games-tab="worst" class="liquid-pill px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 cursor-pointer">
+              <span>💀</span>
+              <span>Топ худших</span>
+            </button>
           </div>
 
           <!-- Search & Sort -->
@@ -462,8 +543,7 @@
               <button id="clear-games-search" type="button" title="Очистить поиск" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white/10 hover:bg-white/20 text-xs text-slate-300 hover:text-white flex items-center justify-center transition cursor-pointer">✕</button>
             </div>
             <select id="games-sort" class="px-4 py-2.5 rounded-full bg-[#141b29] border border-white/15 text-sm text-slate-200 cursor-pointer">
-              <option value="highest">Высокий балл</option>
-              <option value="lowest">Низкий балл</option>
+              <option value="rating">По рейтингу топа</option>
               <option value="most">Больше оценок</option>
               <option value="newest">Недавно оценённые</option>
               <option value="alpha">По алфавиту (А–Я)</option>
@@ -538,11 +618,17 @@
         <div id="profile-tab-reviews" class="space-y-5 anim-view">
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div class="liquid-glass rounded-[26px] p-5">
-              <h3 class="text-base font-bold text-[#d9ff00] mb-3">Топ лучших игр</h3>
+              <button type="button" data-open-games-top="best" class="w-full flex items-center justify-between gap-2 mb-3 group cursor-pointer text-left">
+                <h3 class="text-base font-bold text-[#d9ff00] group-hover:underline">Топ лучших игр</h3>
+                <span class="text-[11px] font-semibold text-slate-400 group-hover:text-[#d9ff00] transition flex items-center gap-1">Весь топ <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></span>
+              </button>
               <div id="profile-top-best" class="space-y-2.5"></div>
             </div>
             <div class="liquid-glass rounded-[26px] p-5">
-              <h3 class="text-base font-bold text-rose-400 mb-3">Топ худших игр</h3>
+              <button type="button" data-open-games-top="worst" class="w-full flex items-center justify-between gap-2 mb-3 group cursor-pointer text-left">
+                <h3 class="text-base font-bold text-rose-400 group-hover:underline">Топ худших игр</h3>
+                <span class="text-[11px] font-semibold text-slate-400 group-hover:text-rose-400 transition flex items-center gap-1">Весь топ <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></span>
+              </button>
               <div id="profile-top-worst" class="space-y-2.5"></div>
             </div>
           </div>
@@ -615,7 +701,8 @@
               <button id="clear-steam-search" type="button" title="Очистить поиск" class="hidden absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white/10 hover:bg-white/20 text-xs text-slate-300 hover:text-white flex items-center justify-center transition cursor-pointer">✕</button>
             </div>
             <div id="steam-search-status" class="text-xs text-slate-400"></div>
-            <div id="steam-search-results" class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[48vh] overflow-y-auto overscroll-contain pr-1"></div>
+            <div id="steam-search-results" class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[44vh] overflow-y-auto overscroll-contain pr-1"></div>
+            <div id="steam-search-pagination" class="hidden flex items-center justify-center flex-wrap gap-1.5 pt-1"></div>
           </div>
 
           <div id="custom-game-panel" class="hidden space-y-4">
@@ -768,7 +855,7 @@
 
     let currentUser = null, users = [], reviews = [], myLibrary = [], libraryPrivate = false, libraryError = '';
     let notifications = [], notifFilter = 'all', notifOpen = false;
-    let gamesCatFilter = 'all', gamesSelectedGenres = new Set(), gamesSelectedTags = new Set(), gamesFiltersOpen = false, gamesShowAllTags = false;
+    let gamesSubTab = 'best', gamesCatFilter = 'all', gamesSelectedGenres = new Set(), gamesSelectedTags = new Set(), gamesFiltersOpen = false, gamesShowAllTags = false;
     let userGameLists = [], profileSubTab = 'reviews', profileListSort = 'custom', selectedSwapListId = null, modalMode = 'review';
     let activeView = 'home', profileUserId = null, searchTab = 'all', selectedGame = null, editingReviewId = null;
     let lastDisplayedGames = [];
@@ -936,6 +1023,13 @@
       }, 2400);
     }
 
+    function hideBootLoader() {
+      const el = document.getElementById('boot-loader');
+      if (!el || el.classList.contains('hidden')) return;
+      el.classList.add('boot-loader-out');
+      setTimeout(() => el.classList.add('hidden'), 370);
+    }
+
     async function boot() {
       const params = new URLSearchParams(window.location.search);
       const authErr = params.get('auth_err');
@@ -959,7 +1053,7 @@
       }
 
       if (!currentUser) {
-        document.getElementById('boot-loader').classList.add('hidden');
+        hideBootLoader();
         document.getElementById('auth-screen').classList.remove('hidden');
         document.getElementById('app-shell').classList.add('hidden');
         return;
@@ -970,7 +1064,7 @@
       // Load users & reviews BEFORE revealing the page so current tab appears populated immediately
       await Promise.all([loadUsers(), loadReviews(), loadUserLists()]);
       renderApp(true);
-      document.getElementById('boot-loader').classList.add('hidden');
+      hideBootLoader();
       document.getElementById('auth-screen').classList.add('hidden');
       document.getElementById('app-shell').classList.remove('hidden');
       // Fetch Steam library in the background so it doesn't slow down opening the site
@@ -1010,15 +1104,18 @@
 
     function updateNotifBadge() {
       const unread = notifications.filter(n => !n.isRead).length;
-      const badge = document.getElementById('notif-badge');
+      const text = unread > 99 ? '99+' : String(unread);
+      ['notif-badge', 'mnav-notif-badge'].forEach(id => {
+        const b = document.getElementById(id);
+        if (b) {
+          b.textContent = text;
+          b.classList.toggle('hidden', unread === 0);
+        }
+      });
       const btn = document.getElementById('btn-notifications');
-      if (badge) {
-        badge.textContent = unread > 99 ? '99+' : String(unread);
-        badge.classList.toggle('hidden', unread === 0);
-      }
-      if (btn) {
-        btn.classList.toggle('border-[#d9ff00]/50', unread > 0);
-      }
+      if (btn) btn.classList.toggle('border-[#d9ff00]/50', unread > 0);
+      const mbtn = document.getElementById('mnav-notif');
+      if (mbtn) mbtn.classList.toggle('border-[#d9ff00]/50', unread > 0);
     }
 
     function renderNotifPanel() {
@@ -1143,6 +1240,8 @@
       notifOpen = typeof forceState === 'boolean' ? forceState : !notifOpen;
       const panel = document.getElementById('notif-panel');
       if (panel) panel.classList.toggle('hidden', !notifOpen);
+      const mbtn = document.getElementById('mnav-notif');
+      if (mbtn) mbtn.classList.toggle('liquid-pill-active', notifOpen);
       if (notifOpen) {
         renderNotifPanel();
         const hadUnread = notifications.some(n => !n.isRead);
@@ -1533,18 +1632,18 @@
 
       // 1) KPI Row
       document.getElementById('home-kpi-row').innerHTML = `
-        <div class="liquid-glass rounded-[24px] p-4 sm:p-5 flex flex-col justify-between gap-2">
-          <div class="text-xs font-medium text-slate-400">Оценённых игр</div>
-          <div class="flex items-end justify-between gap-2">
-            <div class="text-3xl sm:text-4xl font-black text-white tabular-nums leading-none">${totalUniqueGames}</div>
-            <span class="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-[#66c0f4]/15 text-[#66c0f4] border border-[#66c0f4]/30">уникальных</span>
+        <div class="liquid-glass rounded-[24px] p-3.5 sm:p-5 flex flex-col justify-between gap-2 overflow-hidden min-w-0">
+          <div class="text-xs font-medium text-slate-400 truncate">Оценённых игр</div>
+          <div class="flex flex-wrap items-end justify-between gap-1.5 min-w-0">
+            <div class="text-2xl sm:text-4xl font-black text-white tabular-nums leading-none">${totalUniqueGames}</div>
+            <span class="text-[10px] sm:text-[11px] font-semibold px-2 sm:px-2.5 py-0.5 rounded-full bg-[#66c0f4]/15 text-[#66c0f4] border border-[#66c0f4]/30 shrink-0">уникальных</span>
           </div>
         </div>
-        <div class="liquid-glass rounded-[24px] p-4 sm:p-5 flex flex-col justify-between gap-2">
-          <div class="text-xs font-medium text-slate-400">Всего обзоров</div>
-          <div class="flex items-end justify-between gap-2">
-            <div class="text-3xl sm:text-4xl font-black text-[#d9ff00] tabular-nums leading-none">${totalReviews}</div>
-            <span class="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-[#d9ff00]/15 text-[#d9ff00] border border-[#d9ff00]/30">в ленте</span>
+        <div class="liquid-glass rounded-[24px] p-3.5 sm:p-5 flex flex-col justify-between gap-2 overflow-hidden min-w-0">
+          <div class="text-xs font-medium text-slate-400 truncate">Всего обзоров</div>
+          <div class="flex flex-wrap items-end justify-between gap-1.5 min-w-0">
+            <div class="text-2xl sm:text-4xl font-black text-[#d9ff00] tabular-nums leading-none">${totalReviews}</div>
+            <span class="text-[10px] sm:text-[11px] font-semibold px-2 sm:px-2.5 py-0.5 rounded-full bg-[#d9ff00]/15 text-[#d9ff00] border border-[#d9ff00]/30 shrink-0">в ленте</span>
           </div>
         </div>
         <div class="liquid-glass rounded-[24px] p-4 sm:p-5 flex flex-col justify-between gap-2">
@@ -1554,11 +1653,11 @@
             <span class="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full ${totalReviews ? 'text-[#090c12]' : 'text-slate-400 bg-white/10'}" ${totalReviews ? `style="background:${avgMeta.bg};"` : ''}>${avgMeta.l}</span>
           </div>
         </div>
-        <div class="liquid-glass rounded-[24px] p-4 sm:p-5 flex flex-col justify-between gap-2">
-          <div class="text-xs font-medium text-slate-400">Критиков на сайте</div>
-          <div class="flex items-end justify-between gap-2">
-            <div class="text-3xl sm:text-4xl font-black text-[#eaf4ff] tabular-nums leading-none">${users.length}</div>
-            <span class="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-white/10 text-slate-300 border border-white/15">Steam</span>
+        <div class="liquid-glass rounded-[24px] p-3.5 sm:p-5 flex flex-col justify-between gap-2 overflow-hidden min-w-0">
+          <div class="text-xs font-medium text-slate-400 truncate">Гиен на сайте</div>
+          <div class="flex flex-wrap items-end justify-between gap-1.5 min-w-0">
+            <div class="text-2xl sm:text-4xl font-black text-[#eaf4ff] tabular-nums leading-none">${users.length}</div>
+            <span class="text-[10px] sm:text-[11px] font-semibold px-2 sm:px-2.5 py-0.5 rounded-full bg-white/10 text-slate-300 border border-white/15 shrink-0">Steam</span>
           </div>
         </div>
       `;
@@ -1837,7 +1936,13 @@
 
       // Filter & Sort Games (Multi-select AND across genres & tags)
       const q = (document.getElementById('games-search')?.value || '').trim().toLowerCase();
-      const sort = document.getElementById('games-sort')?.value || 'highest';
+      const titleEl = document.getElementById('games-view-title');
+      if (titleEl) titleEl.textContent = gamesSubTab === 'worst' ? 'Топ худших игр' : 'Топ лучших игр';
+      document.querySelectorAll('#games-subtabs [data-games-tab]').forEach(btn => {
+        btn.classList.toggle('liquid-pill-active', btn.dataset.gamesTab === gamesSubTab);
+      });
+
+      const sort = document.getElementById('games-sort')?.value || 'rating';
       let list = allGames.filter(g => {
         if (gamesCatFilter !== 'all' && g.cat !== gamesCatFilter) return false;
         for (const gn of gamesSelectedGenres) {
@@ -1850,8 +1955,10 @@
         return true;
       });
 
-      if (sort === 'highest') list.sort((a, b) => b.avg - a.avg || b.count - a.count);
-      else if (sort === 'lowest') list.sort((a, b) => a.avg - b.avg || b.count - a.count);
+      if (sort === 'rating') {
+        if (gamesSubTab === 'worst') list.sort((a, b) => a.avg - b.avg || b.count - a.count);
+        else list.sort((a, b) => b.avg - a.avg || b.count - a.count);
+      }
       else if (sort === 'most') list.sort((a, b) => b.count - a.count || b.avg - a.avg);
       else if (sort === 'newest') list.sort((a, b) => b.latestAt - a.latestAt);
       else if (sort === 'alpha') list.sort((a, b) => a.title.localeCompare(b.title));
@@ -2162,7 +2269,54 @@
     }
 
     let steamSearchSeq = 0;
-    async function renderSearchResults(animate = false) {
+    let modalSearchPage = 1;
+    let lastSteamSearchQuery = '';
+    let lastSteamSearchItems = [];
+    const MODAL_PAGE_SIZE = 16;
+
+    function renderModalPagination(curPage, totalPages) {
+      const el = document.getElementById('steam-search-pagination');
+      if (!el) return;
+      if (!totalPages || totalPages <= 1) {
+        el.classList.add('hidden');
+        el.innerHTML = '';
+        return;
+      }
+      el.classList.remove('hidden');
+      const pages = [];
+      const addP = p => { if (p >= 1 && p <= totalPages && !pages.includes(p)) pages.push(p); };
+      addP(1);
+      for (let p = curPage - 1; p <= curPage + 1; p++) addP(p);
+      addP(totalPages);
+      pages.sort((a, b) => a - b);
+
+      let htmlBtns = `<button type="button" data-mpage="${Math.max(1, curPage - 1)}" ${curPage <= 1 ? 'disabled' : ''} class="liquid-pill px-2.5 py-1 rounded-full text-xs font-bold ${curPage <= 1 ? 'opacity-35 cursor-not-allowed' : 'cursor-pointer hover:text-[#d9ff00]'}">‹</button>`;
+      let prev = 0;
+      for (const p of pages) {
+        if (prev && p - prev > 1) {
+          htmlBtns += '<span class="px-1 text-xs text-slate-500 select-none">…</span>';
+        }
+        const active = p === curPage;
+        htmlBtns += `<button type="button" data-mpage="${p}" class="liquid-pill ${active ? 'liquid-pill-active text-[#d9ff00]' : 'text-slate-300 hover:text-white'} min-w-[30px] px-2 py-1 rounded-full text-xs font-bold tabular-nums cursor-pointer">${p}</button>`;
+        prev = p;
+      }
+      htmlBtns += `<button type="button" data-mpage="${Math.min(totalPages, curPage + 1)}" ${curPage >= totalPages ? 'disabled' : ''} class="liquid-pill px-2.5 py-1 rounded-full text-xs font-bold ${curPage >= totalPages ? 'opacity-35 cursor-not-allowed' : 'cursor-pointer hover:text-[#d9ff00]'}">›</button>`;
+      el.innerHTML = htmlBtns;
+    }
+
+    document.getElementById('steam-search-pagination').onclick = e => {
+      const btn = e.target.closest('[data-mpage]');
+      if (!btn || btn.disabled) return;
+      const nextP = Number(btn.dataset.mpage) || 1;
+      if (nextP === modalSearchPage) return;
+      modalSearchPage = nextP;
+      const box = document.getElementById('steam-search-results');
+      if (box) box.scrollTop = 0;
+      renderSearchResults(false);
+    };
+
+    async function renderSearchResults(animate = false, resetPage = false) {
+      if (resetPage) modalSearchPage = 1;
       const mySeq = ++steamSearchSeq;
       const q = document.getElementById('steam-game-search').value.trim();
       const status = document.getElementById('steam-search-status');
@@ -2171,38 +2325,74 @@
         if (libraryError && !myLibrary.length) {
           status.innerHTML = `<span class="text-rose-300">${esc(libraryError)}</span> <button type="button" id="btn-retry-lib" class="ml-2 underline text-[#d9ff00] cursor-pointer">Обновить</button>`;
           box.innerHTML = '';
+          renderModalPagination(1, 0);
           const retry = document.getElementById('btn-retry-lib');
-          if (retry) retry.onclick = async () => { status.textContent = 'Загрузка библиотеки Steam...'; await loadMyLibrary(); renderSearchResults(); };
+          if (retry) retry.onclick = async () => { status.textContent = 'Загрузка библиотеки Steam...'; await loadMyLibrary(); renderSearchResults(false, true); };
           return;
         }
         if (libraryPrivate && !myLibrary.length) {
           status.innerHTML = `Библиотека Steam скрыта настройками приватности. Откройте доступ к «Информации об играх» в настройках профиля Steam. <button type="button" id="btn-retry-lib" class="ml-2 underline text-[#d9ff00] cursor-pointer">Обновить</button>`;
           box.innerHTML = '';
+          renderModalPagination(1, 0);
           const retry = document.getElementById('btn-retry-lib');
-          if (retry) retry.onclick = async () => { status.textContent = 'Загрузка библиотеки Steam...'; await loadMyLibrary(); renderSearchResults(); };
+          if (retry) retry.onclick = async () => { status.textContent = 'Загрузка библиотеки Steam...'; await loadMyLibrary(); renderSearchResults(false, true); };
           return;
         }
-        const filtered = myLibrary.filter(g => !q || g.title.toLowerCase().includes(q.toLowerCase())).slice(0, 40);
-        status.innerHTML = `В вашей библиотеке Steam: ${myLibrary.length} игр <button type="button" id="btn-retry-lib" class="ml-2 underline text-[#66c0f4] cursor-pointer">Обновить</button>`;
+        const allFiltered = myLibrary.filter(g => !q || g.title.toLowerCase().includes(q.toLowerCase()));
+        const totalPages = Math.max(1, Math.ceil(allFiltered.length / MODAL_PAGE_SIZE));
+        if (modalSearchPage > totalPages) modalSearchPage = totalPages;
+        const start = (modalSearchPage - 1) * MODAL_PAGE_SIZE;
+        const pageItems = allFiltered.slice(start, start + MODAL_PAGE_SIZE);
+        status.innerHTML = `${q ? `Найдено в библиотеке: ${allFiltered.length}` : `В вашей библиотеке Steam: ${myLibrary.length} игр`}${totalPages > 1 ? ` · стр. ${modalSearchPage} из ${totalPages}` : ''} <button type="button" id="btn-retry-lib" class="ml-2 underline text-[#66c0f4] cursor-pointer">Обновить</button>`;
         const retry = document.getElementById('btn-retry-lib');
-        if (retry) retry.onclick = async () => { status.textContent = 'Обновление библиотеки Steam...'; await loadMyLibrary(); renderSearchResults(); };
-        box.innerHTML = renderGameButtons(filtered, true, animate);
+        if (retry) retry.onclick = async () => { status.textContent = 'Обновление библиотеки Steam...'; await loadMyLibrary(); renderSearchResults(false, true); };
+        box.innerHTML = renderGameButtons(pageItems, true, animate);
+        renderModalPagination(modalSearchPage, totalPages);
         return;
       }
+
+      // Весь каталог Steam — без ключевых слов листаем популярный каталог постранично!
       if (q.length < 2) {
-        status.textContent = 'Введите минимум 2 символа для поиска по всему каталогу Steam...';
-        box.innerHTML = '';
+        status.textContent = `Загрузка каталога Steam (стр. ${modalSearchPage})...`;
+        if (animate) box.innerHTML = '';
+        try {
+          const r = await fetch(`/api/steam/browse?page=${modalSearchPage}&limit=${MODAL_PAGE_SIZE}`);
+          if (mySeq !== steamSearchSeq) return;
+          const d = await r.json();
+          if (mySeq !== steamSearchSeq) return;
+          const list = d.games || [];
+          const totalPages = d.totalPages || 50;
+          status.textContent = `Популярные игры Steam · стр. ${modalSearchPage} из ${totalPages}`;
+          box.innerHTML = renderGameButtons(list, false, animate);
+          renderModalPagination(modalSearchPage, totalPages);
+        } catch {
+          if (mySeq !== steamSearchSeq) return;
+          status.textContent = 'Не удалось загрузить каталог Steam — введите название игры для поиска.';
+          renderModalPagination(1, 0);
+        }
         return;
       }
-      status.textContent = 'Поиск в Steam...';
-      if (animate) box.innerHTML = '';
-      const r = await fetch('/api/steam/search?q=' + encodeURIComponent(q));
-      if (mySeq !== steamSearchSeq) return;
-      const d = await r.json();
-      if (mySeq !== steamSearchSeq) return;
-      const list = d.games || [];
-      status.textContent = `Найдено в Steam: ${list.length}`;
-      box.innerHTML = renderGameButtons(list, false, animate);
+
+      // Поиск по ключевому слову с постраничной навигацией
+      let list = lastSteamSearchItems;
+      if (q !== lastSteamSearchQuery) {
+        status.textContent = 'Поиск в Steam...';
+        if (animate) box.innerHTML = '';
+        const r = await fetch('/api/steam/search?q=' + encodeURIComponent(q));
+        if (mySeq !== steamSearchSeq) return;
+        const d = await r.json();
+        if (mySeq !== steamSearchSeq) return;
+        list = d.games || [];
+        lastSteamSearchQuery = q;
+        lastSteamSearchItems = list;
+      }
+      const totalPages = Math.max(1, Math.ceil(list.length / MODAL_PAGE_SIZE));
+      if (modalSearchPage > totalPages) modalSearchPage = totalPages;
+      const start = (modalSearchPage - 1) * MODAL_PAGE_SIZE;
+      const pageItems = list.slice(start, start + MODAL_PAGE_SIZE);
+      status.textContent = `Найдено в Steam: ${list.length}${totalPages > 1 ? ` · стр. ${modalSearchPage} из ${totalPages}` : ''}`;
+      box.innerHTML = renderGameButtons(pageItems, false, animate);
+      renderModalPagination(modalSearchPage, totalPages);
     }
 
     function openRateStep(game) {
@@ -2378,7 +2568,7 @@
       document.getElementById('steam-search-panel').classList.toggle('hidden', tab === 'custom');
       document.getElementById('custom-game-panel').classList.toggle('hidden', tab !== 'custom');
       if (tab === 'custom') renderExistingCustomGames();
-      else renderSearchResults(true);
+      else renderSearchResults(true, true);
     }
 
     document.getElementById('tab-all-steam').onclick = () => setSearchTab('all');
@@ -2472,7 +2662,7 @@
       const initTags = (document.getElementById('custom-game-tags')?.value || '').split(',').map(x => x.trim()).filter(Boolean);
       openRateStep({ appId: 0, title, img: cover, initGenres, initTags });
     };
-    document.getElementById('steam-game-search').oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => renderSearchResults(false), 200); };
+    document.getElementById('steam-game-search').oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => renderSearchResults(false, true), 200); };
     async function addGameToUserList(game, listType) {
       const tempId = 'lst_tmp_' + Date.now();
       // Optimistic add / move
@@ -3269,11 +3459,37 @@
 
     bindClearSearch('feed-search', 'clear-feed-search', () => renderFeedListOnly());
     bindClearSearch('profile-search', 'clear-profile-search', () => renderProfileListOnly(false));
-    bindClearSearch('steam-game-search', 'clear-steam-search', () => renderSearchResults(false));
+    bindClearSearch('steam-game-search', 'clear-steam-search', () => renderSearchResults(false, true));
     bindClearSearch('games-search', 'clear-games-search', () => renderGamesCatalog(false));
     let gamesSearchTimer = null;
     document.getElementById('games-search').oninput = () => { clearTimeout(gamesSearchTimer); gamesSearchTimer = setTimeout(() => renderGamesCatalog(false), 120); };
     document.getElementById('games-sort').onchange = () => renderGamesCatalog(false);
+    document.querySelectorAll('#games-subtabs [data-games-tab]').forEach(btn => {
+      btn.onclick = () => {
+        const nextTab = btn.dataset.gamesTab;
+        if (gamesSubTab === nextTab) return;
+        gamesSubTab = nextTab;
+        const sortSel = document.getElementById('games-sort');
+        if (sortSel) sortSel.value = 'rating';
+        renderGamesCatalog(true);
+      };
+    });
+    document.addEventListener('click', e => {
+      const topBtn = e.target.closest('[data-open-games-top]');
+      if (!topBtn) return;
+      gamesSubTab = topBtn.dataset.openGamesTop === 'worst' ? 'worst' : 'best';
+      gamesCatFilter = 'all';
+      gamesSelectedGenres.clear();
+      gamesSelectedTags.clear();
+      const gs = document.getElementById('games-search');
+      if (gs) gs.value = '';
+      const sortSel = document.getElementById('games-sort');
+      if (sortSel) sortSel.value = 'rating';
+      activeView = 'games';
+      openEmojiPickerId = null;
+      renderApp(true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
     document.getElementById('btn-toggle-games-filters').onclick = () => {
       gamesFiltersOpen = !gamesFiltersOpen;
       renderGamesCatalog(false);
@@ -3289,6 +3505,13 @@
       e.stopPropagation();
       toggleNotifPanel();
     };
+    const mnavNotifBtn = document.getElementById('mnav-notif');
+    if (mnavNotifBtn) {
+      mnavNotifBtn.onclick = e => {
+        e.stopPropagation();
+        toggleNotifPanel();
+      };
+    }
 
 
 
@@ -3340,7 +3563,7 @@
     };
 
     document.addEventListener('click', e => {
-      if (notifOpen && !e.target.closest('#notif-panel') && !e.target.closest('#btn-notifications')) {
+      if (notifOpen && !e.target.closest('#notif-panel') && !e.target.closest('#btn-notifications') && !e.target.closest('#mnav-notif')) {
         toggleNotifPanel(false);
       }
     });
@@ -3522,6 +3745,7 @@
         root.style.setProperty('--vv-height', `${Math.round(curH)}px`);
 
         const isOpenNow = kb > 110;
+        document.body.classList.toggle('kb-open', isOpenNow);
         if (isOpenNow && !kbWasOpen) {
           kbWasOpen = true;
           const active = document.activeElement;
