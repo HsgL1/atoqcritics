@@ -1293,31 +1293,39 @@
       const hasOc = ext.ocScore !== null && ext.ocScore !== undefined;
       if (!hasMc && !hasOc) return '';
 
-      const scoreDot = s => s >= 75 ? '#38e8b0' : (s >= 50 ? '#fbbf24' : '#fb7185');
-      const ocTierDot = (t, s) => {
+      const scoreColor = s => s >= 75 ? '#38e8b0' : (s >= 50 ? '#fbbf24' : '#fb7185');
+      const ocTierColor = (t, s) => {
         const k = String(t || '').toLowerCase();
         if (k === 'mighty') return '#d9ff00';
         if (k === 'strong') return '#38e8b0';
         if (k === 'fair') return '#fbbf24';
         if (k === 'weak') return '#fb7185';
-        return scoreDot(s);
+        return scoreColor(s);
       };
 
       const parts = [];
       if (hasMc) {
         const s = Number(ext.mcScore);
-        const inner = `<span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:${scoreDot(s)};"></span><span class="text-slate-400 font-semibold">MC</span><span class="text-slate-100 font-bold tabular-nums">${s}</span>`;
+        const c = scoreColor(s);
+        const inner = `
+          <span class="px-1.5 py-[1px] rounded-md text-[9px] sm:text-[10px] font-black tracking-tight bg-[#ffcc34]/20 text-[#ffd85c] border border-[#ffcc34]/35">MC</span>
+          <span class="text-xs sm:text-[13px] font-extrabold tabular-nums" style="color:${c};">${s}</span>
+        `;
         parts.push(ext.mcUrl
-          ? `<a href="${esc(ext.mcUrl)}" target="_blank" rel="noopener" title="Metacritic: ${s}/100" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] bg-white/[0.04] hover:bg-white/[0.10] border border-white/10 transition">${inner}</a>`
-          : `<span title="Metacritic: ${s}/100" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] bg-white/[0.04] border border-white/10">${inner}</span>`);
+          ? `<a href="${esc(ext.mcUrl)}" target="_blank" rel="noopener" title="Metacritic: ${s}/100" class="inline-flex items-center gap-1.5 pl-1 pr-2 py-0.5 rounded-xl bg-[#ffcc34]/[0.07] hover:bg-[#ffcc34]/[0.15] border border-[#ffcc34]/30 transition">${inner}</a>`
+          : `<span title="Metacritic: ${s}/100" class="inline-flex items-center gap-1.5 pl-1 pr-2 py-0.5 rounded-xl bg-[#ffcc34]/[0.07] border border-[#ffcc34]/30">${inner}</span>`);
       }
       if (hasOc) {
         const s = Number(ext.ocScore);
+        const c = ocTierColor(ext.ocTier, s);
         const tierLbl = ext.ocTier ? ` (${ext.ocTier})` : '';
-        const inner = `<span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:${ocTierDot(ext.ocTier, s)};"></span><span class="text-slate-400 font-semibold">OC</span><span class="text-slate-100 font-bold tabular-nums">${s}</span>`;
+        const inner = `
+          <span class="px-1.5 py-[1px] rounded-md text-[9px] sm:text-[10px] font-black tracking-tight bg-[#66c0f4]/20 text-[#8fd4ff] border border-[#66c0f4]/35">OC</span>
+          <span class="text-xs sm:text-[13px] font-extrabold tabular-nums" style="color:${c};">${s}</span>
+        `;
         parts.push(ext.ocUrl
-          ? `<a href="${esc(ext.ocUrl)}" target="_blank" rel="noopener" title="OpenCritic: ${s}/100${tierLbl}" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] bg-white/[0.04] hover:bg-white/[0.10] border border-white/10 transition">${inner}</a>`
-          : `<span title="OpenCritic: ${s}/100${tierLbl}" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] bg-white/[0.04] border border-white/10">${inner}</span>`);
+          ? `<a href="${esc(ext.ocUrl)}" target="_blank" rel="noopener" title="OpenCritic: ${s}/100${tierLbl}" class="inline-flex items-center gap-1.5 pl-1 pr-2 py-0.5 rounded-xl bg-[#66c0f4]/[0.08] hover:bg-[#66c0f4]/[0.16] border border-[#66c0f4]/30 transition">${inner}</a>`
+          : `<span title="OpenCritic: ${s}/100${tierLbl}" class="inline-flex items-center gap-1.5 pl-1 pr-2 py-0.5 rounded-xl bg-[#66c0f4]/[0.08] border border-[#66c0f4]/30">${inner}</span>`);
       }
 
       if (showDelta && siteScore !== null && siteScore !== undefined) {
@@ -1330,9 +1338,9 @@
           if (Math.abs(diff) >= 3) {
             const sign = diff > 0 ? '+' : '';
             const cls = diff > 0
-              ? 'text-[#9bd6f9]/90 bg-[#66c0f4]/10 border-[#66c0f4]/20'
-              : 'text-rose-300/90 bg-rose-500/10 border-rose-400/20';
-            parts.push(`<span title="Разница между оценкой AToQcritics (${Math.round(siteScore)}) и критиками (${avgCritic})" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border ${cls} tabular-nums">${sign}${diff} к критикам</span>`);
+              ? 'text-[#9bd6f9] bg-[#66c0f4]/12 border-[#66c0f4]/30'
+              : 'text-rose-300 bg-rose-500/12 border-rose-400/30';
+            parts.push(`<span title="Разница с прессой (${avgCritic})" class="inline-flex items-center px-2 py-0.5 rounded-xl text-[10px] sm:text-[11px] font-semibold border ${cls} tabular-nums">${sign}${diff} к прессе</span>`);
           }
         }
       }
@@ -1613,8 +1621,8 @@
                     </button>
                     ${rev.hoursPlayed ? `<span class="text-sm font-semibold text-[#7ccaf8]">• ${rev.hoursPlayed} ч.</span>` : ''}
                     ${renderAchievementsBadge(rev)}
-                    ${renderExternalRatingPills(rev.externalRatings, null, false)}
                   </div>
+                  ${renderExternalRatingPills(rev.externalRatings, rev.total, true) ? `<div class="flex items-center gap-1.5 mt-2 flex-wrap">${renderExternalRatingPills(rev.externalRatings, rev.total, true)}</div>` : ''}
                 </div>
                 <!-- Metacritic-style colored background score badge with site-obsidian numbers -->
                 <div class="rounded-2xl min-w-[66px] sm:min-w-[78px] px-2.5 sm:px-3.5 py-2 sm:py-2.5 text-center shrink-0" style="background:${m.bg}; box-shadow:${m.shadow};">
