@@ -16,7 +16,7 @@
   <style>
     :root { --bg-obsidian: #090c12; --accent-lime: #d9ff00; --accent-steam: #66c0f4; }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    html, body { margin: 0; font-family: 'Inter', sans-serif; background: var(--bg-obsidian); color: #f1f5f9; min-height: 100vh; overflow-x: hidden; }
+    html, body { margin: 0; font-family: 'Inter', sans-serif; background: var(--bg-obsidian); color: #f1f5f9; min-height: 100vh; overflow-x: clip; }
     .ambient-bg {
       position: fixed; top: -60px; bottom: -140px; left: 0; right: 0; z-index: 0; pointer-events: none;
       transform: translate3d(0, 0, 0);
@@ -237,8 +237,8 @@
 
   <!-- MAIN APP -->
   <div id="app-shell" class="hidden relative z-10 min-h-screen flex flex-col">
-    <header class="sticky top-0 z-30 px-3 sm:px-6 pt-2.5 sm:pt-3 pb-2 space-y-2">
-      <div class="max-w-6xl mx-auto liquid-glass rounded-full px-3 sm:px-4 py-2 flex items-center justify-between gap-2">
+    <header class="fixed top-0 left-0 right-0 z-30 px-3 sm:px-6 pt-[calc(0.65rem+env(safe-area-inset-top))] sm:pt-3 pb-2 space-y-2 bg-gradient-to-b from-[#090c12]/90 via-[#090c12]/55 to-transparent pointer-events-none">
+      <div class="pointer-events-auto max-w-6xl mx-auto liquid-glass rounded-full px-3 sm:px-4 py-2 flex items-center justify-between gap-2">
         <button id="nav-brand" type="button" class="flex items-center gap-2 sm:gap-2.5 cursor-pointer group shrink-0">
           <img src="/logo.jpg" alt="AToQ" class="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover border border-white/25 group-hover:scale-105 transition" />
           <span class="text-base sm:text-xl font-black italic atoq-wordmark">AToQcritics</span>
@@ -255,7 +255,7 @@
       </div>
 
       <!-- Mobile Sticky Top Tabs -->
-      <nav class="sm:hidden max-w-6xl mx-auto liquid-glass rounded-full p-1 grid grid-cols-3 gap-1" aria-label="Мобильная навигация">
+      <nav class="pointer-events-auto sm:hidden max-w-6xl mx-auto liquid-glass rounded-full p-1 grid grid-cols-3 gap-1" aria-label="Мобильная навигация">
         <button id="mnav-home" type="button" class="liquid-pill py-2 px-2 rounded-full text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer">
           <i data-lucide="bar-chart-3" class="w-3.5 h-3.5"></i>
           <span>Главная</span>
@@ -271,7 +271,7 @@
       </nav>
     </header>
 
-    <main class="flex-1 w-full max-w-6xl mx-auto px-3 sm:px-6 pt-2 sm:pt-4 pb-12 sm:pb-16">
+    <main class="flex-1 w-full max-w-6xl mx-auto px-3 sm:px-6 pt-[124px] sm:pt-[86px] pb-12 sm:pb-16">
       <section id="view-home" class="space-y-5 anim-view">
         <!-- Hero KPI Summary Row -->
         <div id="home-kpi-row" class="grid grid-cols-2 lg:grid-cols-4 gap-3.5"></div>
