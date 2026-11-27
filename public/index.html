@@ -721,7 +721,7 @@
           const isFresh = lastAnimatedReaction === `${rev.id}:${emoji}`;
           if (own) {
             return `
-              <div class="relative group/rx">
+              <div data-rx-wrap="1" class="relative group/rx">
                 <span class="liquid-pill-static px-3 py-1.5 rounded-full text-sm flex items-center gap-1.5 cursor-default opacity-80 text-slate-200">
                   <span class="text-lg leading-none">${emoji}</span>
                   <span class="font-semibold text-xs">${list.length}</span>
@@ -731,7 +731,7 @@
             `;
           }
           return `
-            <div class="relative group/rx">
+            <div data-rx-wrap="1" class="relative group/rx">
               <button
                 type="button"
                 data-react-review="${esc(rev.id)}"
@@ -748,14 +748,14 @@
 
       return `
         <div class="flex flex-wrap items-center gap-2">
-          <div class="relative group/rx">
+          <div data-rx-wrap="1" class="relative group/rx">
             ${own
               ? `<span title="Нельзя ставить реакции на свой обзор" class="liquid-pill-static px-3.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 cursor-default opacity-75 text-slate-200"><span class="text-lg leading-none">👍</span><span>${rev.likes.length}</span></span>`
               : `<button type="button" data-vote="${rev.id}" data-val="1" class="liquid-pill px-3.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 cursor-pointer ${liked ? 'text-[#d9ff00] border-[#d9ff00]/60 bg-[#d9ff00]/10' : 'text-slate-200'}"><span class="text-lg leading-none">👍</span><span>${rev.likes.length}</span></button>`
             }
             ${renderReactionTooltip(rev.likes, '👍', !own)}
           </div>
-          <div class="relative group/rx">
+          <div data-rx-wrap="1" class="relative group/rx">
             ${own
               ? `<span title="Нельзя ставить реакции на свой обзор" class="liquid-pill-static px-3.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 cursor-default opacity-75 text-slate-200"><span class="text-lg leading-none">👎</span><span>${rev.dislikes.length}</span></span>`
               : `<button type="button" data-vote="${rev.id}" data-val="-1" class="liquid-pill px-3.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 cursor-pointer ${disliked ? 'text-rose-400 border-rose-400/60 bg-rose-500/10' : 'text-slate-200'}"><span class="text-lg leading-none">👎</span><span>${rev.dislikes.length}</span></button>`
@@ -1631,7 +1631,7 @@
       }
       lastTouchTap = { key: tapKey, time: now };
       closeAllTouchTooltips();
-      const wrap = triggerEl.closest('.group\/rx');
+      const wrap = triggerEl.closest('[data-rx-wrap]');
       const tip = wrap && wrap.querySelector('[data-rx-tooltip]');
       if (tip) tip.classList.add('rx-tooltip-open');
       return false; // 1st tap -> only show tooltip!
@@ -1646,7 +1646,7 @@
       if (!e.target.closest('[data-toggle-comment-emoji]') && !e.target.closest('[data-comment-emoji-box]')) {
         document.querySelectorAll('[data-comment-emoji-box]').forEach(box => box.classList.add('hidden'));
       }
-      if (!e.target.closest('.group\/rx')) {
+      if (!e.target.closest('[data-rx-wrap]')) {
         closeAllTouchTooltips();
       }
     });
@@ -1711,7 +1711,7 @@
       // Touch single-tap on own-review read-only likes/dislikes/reactions shows who reacted
       const staticPill = e.target.closest('.liquid-pill-static');
       if (staticPill && isTouchDevice()) {
-        const wrap = staticPill.closest('.group\/rx');
+        const wrap = staticPill.closest('[data-rx-wrap]');
         const tip = wrap && wrap.querySelector('[data-rx-tooltip]');
         if (tip) {
           e.stopPropagation();
