@@ -484,30 +484,77 @@
         <div id="profile-back-bar" class="hidden">
           <button id="btn-back-to-feed" type="button" class="liquid-pill px-4 py-2 rounded-full text-xs sm:text-sm cursor-pointer">← Вернуться в ленту</button>
         </div>
-        <div id="profile-header-card" class="liquid-glass rounded-[28px] p-6"></div>
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div class="liquid-glass rounded-[26px] p-5">
-            <h3 class="text-base font-bold text-[#d9ff00] mb-3">Топ лучших игр</h3>
-            <div id="profile-top-best" class="space-y-2.5"></div>
+        <div id="profile-header-card" class="liquid-glass rounded-[28px] p-5 sm:p-6"></div>
+
+        <!-- Profile Sub-Tabs: Обзоры / Играю / Хочу поиграть -->
+        <div id="profile-subtabs" class="liquid-glass rounded-full p-1.5 grid grid-cols-3 gap-1 sm:inline-grid sm:w-auto">
+          <button type="button" data-profile-tab="reviews" class="liquid-pill liquid-pill-active px-3 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 cursor-pointer">
+            <span>Обзоры</span>
+            <span id="ptab-cnt-reviews" class="text-[11px] opacity-75 tabular-nums">0</span>
+          </button>
+          <button type="button" data-profile-tab="playing" class="liquid-pill px-3 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 cursor-pointer">
+            <i data-lucide="gamepad-2" class="w-3.5 h-3.5 text-[#d9ff00] shrink-0 hidden sm:inline"></i>
+            <span>Играю</span>
+            <span id="ptab-cnt-playing" class="text-[11px] opacity-75 tabular-nums">0</span>
+          </button>
+          <button type="button" data-profile-tab="want" class="liquid-pill px-3 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 cursor-pointer">
+            <i data-lucide="clock" class="w-3.5 h-3.5 text-[#66c0f4] shrink-0 hidden sm:inline"></i>
+            <span class="truncate">Хочу поиграть</span>
+            <span id="ptab-cnt-want" class="text-[11px] opacity-75 tabular-nums">0</span>
+          </button>
+        </div>
+
+        <!-- TAB 1: REVIEWS -->
+        <div id="profile-tab-reviews" class="space-y-5 anim-view">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div class="liquid-glass rounded-[26px] p-5">
+              <h3 class="text-base font-bold text-[#d9ff00] mb-3">Топ лучших игр</h3>
+              <div id="profile-top-best" class="space-y-2.5"></div>
+            </div>
+            <div class="liquid-glass rounded-[26px] p-5">
+              <h3 class="text-base font-bold text-rose-400 mb-3">Топ худших игр</h3>
+              <div id="profile-top-worst" class="space-y-2.5"></div>
+            </div>
           </div>
-          <div class="liquid-glass rounded-[26px] p-5">
-            <h3 class="text-base font-bold text-rose-400 mb-3">Топ худших игр</h3>
-            <div id="profile-top-worst" class="space-y-2.5"></div>
+          <div class="liquid-glass rounded-[24px] p-3.5 flex flex-col md:flex-row gap-3">
+            <div class="relative flex-1">
+              <input id="profile-search" type="search" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search" placeholder="Поиск в профиле..." class="w-full pl-4 pr-10 py-2.5 rounded-full bg-white/[0.06] border border-white/12 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#66c0f4] transition" />
+              <button id="clear-profile-search" type="button" title="Очистить поиск" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white/10 hover:bg-white/20 text-xs text-slate-300 hover:text-white flex items-center justify-center transition cursor-pointer">✕</button>
+            </div>
+            <select id="profile-sort" class="px-4 py-2.5 rounded-full bg-[#141b29] border border-white/15 text-sm text-slate-200 cursor-pointer">
+              <option value="newest">Сначала новые</option>
+              <option value="highest">Высокий балл</option>
+              <option value="lowest">Низкий балл</option>
+              <option value="popular">Популярные</option>
+            </select>
+          </div>
+          <div id="profile-reviews-list" class="space-y-4"></div>
+        </div>
+
+        <!-- TAB 2 & 3: PLAYING & WANT TO PLAY POSTER GRID -->
+        <div id="profile-tab-list" class="hidden space-y-4 anim-view">
+          <div class="liquid-glass rounded-[26px] p-4 sm:p-6 space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div class="flex items-center gap-2.5">
+                <div id="plist-icon-box" class="w-9 h-9 rounded-2xl flex items-center justify-center"></div>
+                <div>
+                  <h3 id="plist-title" class="text-base sm:text-lg font-bold text-white">Играю сейчас</h3>
+                  <p id="plist-subtitle" class="text-xs text-slate-400"></p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <button id="btn-plist-sort" type="button" title="Сменить сортировку" class="liquid-pill px-3 py-2 rounded-full text-xs font-semibold text-slate-200 flex items-center gap-1.5 cursor-pointer">
+                  <i data-lucide="arrow-up-down" class="w-3.5 h-3.5"></i>
+                  <span id="plist-sort-label">Новые</span>
+                </button>
+                <button id="btn-plist-add" type="button" class="hidden btn-acid px-4 py-2 rounded-full text-xs sm:text-sm cursor-pointer">
+                  + Добавить игру
+                </button>
+              </div>
+            </div>
+            <div id="profile-list-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4"></div>
           </div>
         </div>
-        <div class="liquid-glass rounded-[24px] p-3.5 flex flex-col md:flex-row gap-3">
-          <div class="relative flex-1">
-            <input id="profile-search" type="search" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search" placeholder="Поиск в профиле..." class="w-full pl-4 pr-10 py-2.5 rounded-full bg-white/[0.06] border border-white/12 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#66c0f4] transition" />
-            <button id="clear-profile-search" type="button" title="Очистить поиск" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white/10 hover:bg-white/20 text-xs text-slate-300 hover:text-white flex items-center justify-center transition cursor-pointer">✕</button>
-          </div>
-          <select id="profile-sort" class="px-4 py-2.5 rounded-full bg-[#141b29] border border-white/15 text-sm text-slate-200 cursor-pointer">
-            <option value="newest">Сначала новые</option>
-            <option value="highest">Высокий балл</option>
-            <option value="lowest">Низкий балл</option>
-            <option value="popular">Популярные</option>
-          </select>
-        </div>
-        <div id="profile-reviews-list" class="space-y-4"></div>
       </section>
     </main>
 
@@ -692,6 +739,7 @@
     let currentUser = null, users = [], reviews = [], myLibrary = [], libraryPrivate = false, libraryError = '';
     let notifications = [], notifFilter = 'all', notifOpen = false;
     let gamesCatFilter = 'all', gamesSelectedGenres = new Set(), gamesSelectedTags = new Set(), gamesFiltersOpen = false, gamesShowAllTags = false;
+    let userGameLists = [], profileSubTab = 'reviews', profileListSort = 'newest', modalMode = 'review';
     let activeView = 'home', profileUserId = null, searchTab = 'all', selectedGame = null, editingReviewId = null;
     let lastDisplayedGames = [];
     let modalScores = { gameplay: 16, visuals: 16, narrative: 16, audio: 16, emotions: 16 };
@@ -743,6 +791,27 @@
       }
       img.onerror = null;
       img.src = makeFallbackCover(title);
+    };
+
+    function makeVerticalFallbackPoster(title) {
+      const safe = String(title || 'GAME').slice(0, 22).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="450" viewBox="0 0 300 450"><defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#1b2838"/><stop offset="100%" stop-color="#090c12"/></linearGradient></defs><rect width="300" height="450" fill="url(#g)"/><circle cx="250" cy="60" r="85" fill="#d9ff00" fill-opacity="0.12"/><circle cx="50" cy="390" r="95" fill="#66c0f4" fill-opacity="0.15"/><text x="150" y="218" fill="#eaf4ff" font-family="Inter,sans-serif" font-size="18" font-weight="800" text-anchor="middle">${safe}</text><text x="150" y="246" fill="#66c0f4" font-family="Inter,sans-serif" font-size="10" font-weight="700" letter-spacing="2" text-anchor="middle">ATOQCRITICS</text></svg>`;
+      return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    }
+
+    window.handlePosterError = function(img) {
+      const step = Number(img.dataset.fbStep || 0);
+      const appId = Number(img.dataset.appid || 0);
+      const headerFallback = img.dataset.headerImg || '';
+      const title = img.alt || 'GAME';
+      img.dataset.fbStep = String(step + 1);
+      if (appId > 0) {
+        if (step === 0) { img.src = `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/library_600x900_2x.jpg`; return; }
+        if (step === 1 && headerFallback) { img.src = headerFallback; return; }
+        if (step === 2) { img.src = `/api/steam/cover/${appId}`; return; }
+      }
+      img.onerror = null;
+      img.src = makeVerticalFallbackPoster(title);
     };
 
     function sliderTrackBg(val, color, maxVal = 20) {
@@ -845,7 +914,7 @@
       profileUserId = currentUser.steam_id;
       restoreSavedRoute();
       // Load users & reviews BEFORE revealing the page so current tab appears populated immediately
-      await Promise.all([loadUsers(), loadReviews()]);
+      await Promise.all([loadUsers(), loadReviews(), loadUserLists()]);
       renderApp(true);
       document.getElementById('boot-loader').classList.add('hidden');
       document.getElementById('auth-screen').classList.add('hidden');
@@ -863,6 +932,13 @@
       const r = await fetch('/api/users');
       users = (await r.json()).users || [];
     }
+    async function loadUserLists() {
+      try {
+        const r = await fetch('/api/lists');
+        if (r.ok) userGameLists = (await r.json()).lists || [];
+      } catch {}
+    }
+
     async function loadReviews() {
       const r = await fetch('/api/reviews');
       reviews = (await r.json()).reviews || [];
@@ -1986,7 +2062,7 @@
         const worst = [...uRevs].sort((a,b) => a.total - b.total).slice(0,3);
         document.getElementById('profile-top-best').innerHTML = best.length ? best.map(row).join('') : '<div class="text-xs text-slate-400">Пока нет оценённых игр</div>';
         document.getElementById('profile-top-worst').innerHTML = worst.length ? worst.map(row).join('') : '<div class="text-xs text-slate-400">Пока нет оценённых игр</div>';
-        renderProfileListOnly(animateCards);
+        renderProfileSubTabs(u, uRevs, animateCards);
       }
       if (window.lucide) lucide.createIcons();
     }
@@ -2007,7 +2083,7 @@
       lastDisplayedGames = gamesList;
       return gamesList.map((g, idx) => {
         const delay = Math.min(idx * 24, 240);
-        const reviewed = hasUserReviewedGame(g.appId, g.title);
+        const reviewed = modalMode === 'review' && hasUserReviewedGame(g.appId, g.title);
         if (reviewed) {
           return `
             <div ${animate ? `style="animation-delay:${delay}ms;"` : ''} class="${animate ? 'anim-game-item' : ''} liquid-pill-static rounded-2xl p-2.5 flex items-center gap-3 text-left opacity-55 cursor-not-allowed">
@@ -2149,6 +2225,8 @@
     document.getElementById('btn-new-review').onclick = () => {
       openEmojiPickerId = null;
       editingReviewId = null;
+      modalMode = 'review';
+      document.getElementById('btn-start-custom-review').textContent = 'Перейти к оценке →';
       modalScores = { gameplay: 16, visuals: 16, narrative: 16, audio: 16, emotions: 16 };
       modalNoNarrative = false;
       document.getElementById('modal-title').textContent = 'Новый обзор';
@@ -2252,7 +2330,10 @@
       const b = e.target.closest('[data-pick-custom-idx]');
       if (!b) return;
       const g = existingCustomGamesList[Number(b.dataset.pickCustomIdx)];
-      if (g) openRateStep(g);
+      if (!g) return;
+      if (modalMode === 'list_want') addGameToUserList(g, 'want');
+      else if (modalMode === 'list_playing') addGameToUserList(g, 'playing');
+      else openRateStep(g);
     };
 
     document.getElementById('custom-game-file').onchange = e => {
@@ -2315,21 +2396,60 @@
         document.getElementById('custom-game-title').focus();
         return;
       }
+      const cover = customCoverDataUrl || document.getElementById('custom-game-url').value.trim() || makeVerticalFallbackPoster(title);
+      if (modalMode === 'list_want') {
+        addGameToUserList({ appId: 0, title, img: cover }, 'want');
+        return;
+      }
+      if (modalMode === 'list_playing') {
+        addGameToUserList({ appId: 0, title, img: cover }, 'playing');
+        return;
+      }
       if (hasUserReviewedGame(0, title)) {
         showToast('Вы уже оценили эту игру — отредактируйте существующий обзор');
         return;
       }
-      const cover = customCoverDataUrl || document.getElementById('custom-game-url').value.trim() || makeFallbackCover(title);
       const initGenres = (document.getElementById('custom-game-genres')?.value || '').split(',').map(x => x.trim()).filter(Boolean);
       const initTags = (document.getElementById('custom-game-tags')?.value || '').split(',').map(x => x.trim()).filter(Boolean);
       openRateStep({ appId: 0, title, img: cover, initGenres, initTags });
     };
     document.getElementById('steam-game-search').oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => renderSearchResults(false), 200); };
+    async function addGameToUserList(game, listType) {
+      const tempId = 'lst_tmp_' + Date.now();
+      // Optimistic add / move
+      userGameLists = userGameLists.filter(x => !(x.userId === currentUser.steam_id && (game.appId > 0 ? x.appId === Number(game.appId) : (x.appId === 0 && x.gameTitle.toLowerCase() === game.title.trim().toLowerCase()))));
+      userGameLists.unshift({
+        id: tempId,
+        userId: currentUser.steam_id,
+        listType,
+        appId: Number(game.appId) || 0,
+        gameTitle: game.title,
+        gameImg: game.img || '',
+        createdAt: Date.now()
+      });
+      closeModal();
+      renderApp(false);
+      showToast(listType === 'playing' ? `«${game.title}» добавлена в «Играю»` : `«${game.title}» добавлена в «Хочу поиграть»`);
+      fetch('/api/lists', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ listType, appId: game.appId, gameTitle: game.title, gameImg: game.img })
+      }).then(r => r.ok ? r.json() : null).then(d => {
+        if (d && d.lists) {
+          userGameLists = d.lists;
+          if (activeView === 'profile') renderApp(false);
+        }
+      }).catch(() => {});
+    }
+
     document.getElementById('steam-search-results').onclick = e => {
       const b = e.target.closest('[data-pick-idx]');
       if (!b) return;
       const g = lastDisplayedGames[Number(b.dataset.pickIdx)];
-      if (g) openRateStep(g);
+      if (!g) return;
+      if (modalMode === 'list_want') addGameToUserList(g, 'want');
+      else if (modalMode === 'list_playing') addGameToUserList(g, 'playing');
+      else openRateStep(g);
     };
     document.getElementById('toggle-no-narrative').onchange = e => {
       const next = e.target.checked;
@@ -2413,6 +2533,9 @@
         });
       }
 
+      if (!isEdit) {
+        userGameLists = userGameLists.filter(x => !(x.userId === currentUser.steam_id && (gameSnapshot.appId > 0 ? x.appId === Number(gameSnapshot.appId) : (x.appId === 0 && x.gameTitle.toLowerCase() === gameSnapshot.title.trim().toLowerCase()))));
+      }
       editingReviewId = null;
       document.getElementById('input-review-text').value = '';
       closeModal();
@@ -2476,6 +2599,107 @@
     document.getElementById('feed-search').oninput = () => { clearTimeout(feedSearchTimer); feedSearchTimer = setTimeout(renderFeedListOnly, 120); };
     document.getElementById('feed-sort').onchange = renderFeedListOnly;
     let profileSearchTimer = null;
+    function renderProfileSubTabs(u, uRevs, animateCards = false) {
+      const isOwnProf = u.steam_id === currentUser.steam_id;
+      const playingItems = userGameLists.filter(x => x.userId === u.steam_id && x.listType === 'playing');
+      const wantItems = userGameLists.filter(x => x.userId === u.steam_id && x.listType === 'want');
+
+      document.getElementById('ptab-cnt-reviews').textContent = String(uRevs.length);
+      document.getElementById('ptab-cnt-playing').textContent = String(playingItems.length);
+      document.getElementById('ptab-cnt-want').textContent = String(wantItems.length);
+
+      document.querySelectorAll('[data-profile-tab]').forEach(btn => {
+        btn.classList.toggle('liquid-pill-active', btn.dataset.profileTab === profileSubTab);
+      });
+
+      const isRevTab = profileSubTab === 'reviews';
+      document.getElementById('profile-tab-reviews').classList.toggle('hidden', !isRevTab);
+      document.getElementById('profile-tab-list').classList.toggle('hidden', isRevTab);
+
+      if (isRevTab) {
+        renderProfileListOnly(animateCards);
+        return;
+      }
+
+      const isPlaying = profileSubTab === 'playing';
+      const items = [...(isPlaying ? playingItems : wantItems)];
+      if (profileListSort === 'alpha') items.sort((a, b) => a.gameTitle.localeCompare(b.gameTitle));
+      else items.sort((a, b) => b.createdAt - a.createdAt);
+
+      const iconBox = document.getElementById('plist-icon-box');
+      iconBox.className = isPlaying
+        ? 'w-9 h-9 rounded-2xl bg-[#d9ff00]/15 border border-[#d9ff00]/40 text-[#d9ff00] flex items-center justify-center'
+        : 'w-9 h-9 rounded-2xl bg-[#66c0f4]/15 border border-[#66c0f4]/40 text-[#66c0f4] flex items-center justify-center';
+      iconBox.innerHTML = isPlaying
+        ? '<i data-lucide="gamepad-2" class="w-4 h-4"></i>'
+        : '<i data-lucide="clock" class="w-4 h-4"></i>';
+
+      document.getElementById('plist-title').textContent = isPlaying ? 'Играю сейчас' : 'Хочу поиграть';
+      document.getElementById('plist-subtitle').textContent = isPlaying
+        ? `Игр в процессе прохождения: ${items.length}`
+        : `Игр в списке желаемого: ${items.length}`;
+      document.getElementById('plist-sort-label').textContent = profileListSort === 'alpha' ? 'А–Я' : 'Новые';
+
+      const addBtn = document.getElementById('btn-plist-add');
+      addBtn.classList.toggle('hidden', !isOwnProf);
+
+      const grid = document.getElementById('profile-list-grid');
+      if (!items.length) {
+        grid.innerHTML = `<div class="col-span-full py-10 text-center text-sm text-slate-400">${isOwnProf ? 'Список пока пуст — нажмите «+ Добавить игру», чтобы добавить игру из Steam или стороннюю игру.' : 'Пользователь ещё не добавил игры в этот список.'}</div>`;
+        if (window.lucide) lucide.createIcons();
+        return;
+      }
+
+      grid.innerHTML = items.map((item, idx) => {
+        const posterUrl = item.appId > 0
+          ? `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${item.appId}/library_600x900.jpg`
+          : (item.gameImg || makeVerticalFallbackPoster(item.gameTitle));
+        const delay = Math.min(idx * 25, 220);
+        return `
+          <div class="group relative rounded-[20px] overflow-hidden border border-white/15 bg-[#101724] shadow-lg transition hover:-translate-y-1 hover:border-white/30 ${animateCards ? 'anim-game-item' : ''}" ${animateCards ? `style="animation-delay:${delay}ms;"` : ''}>
+            <div class="aspect-[2/3] w-full relative overflow-hidden bg-[#0e1420]">
+              <img
+                src="${esc(posterUrl)}"
+                data-appid="${item.appId}"
+                data-header-img="${esc(item.gameImg || '')}"
+                onerror="handlePosterError(this)"
+                alt="${esc(item.gameTitle)}"
+                class="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+              />
+              <div class="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[#090c12] via-[#090c12]/80 to-transparent pointer-events-none"></div>
+
+              ${isOwnProf ? `
+                <button
+                  type="button"
+                  data-del-list-item="${esc(item.id)}"
+                  title="Убрать из списка"
+                  class="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/65 backdrop-blur-md border border-white/20 text-slate-200 hover:text-rose-400 hover:border-rose-400/50 text-xs flex items-center justify-center transition cursor-pointer"
+                >✕</button>
+              ` : ''}
+
+              ${item.appId === 0 ? '<span class="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[9px] font-bold bg-black/65 backdrop-blur-md border border-white/15 text-slate-200">Своя</span>' : ''}
+
+              <div class="absolute inset-x-0 bottom-0 p-2.5 space-y-2">
+                <div class="text-xs sm:text-[13px] font-bold text-white leading-tight line-clamp-2 drop-shadow">${esc(item.gameTitle)}</div>
+                ${isOwnProf ? `
+                  <div class="flex items-center gap-1.5">
+                    ${isPlaying ? `
+                      <button type="button" data-rate-from-list="${esc(item.id)}" class="flex-1 py-1.5 px-2 rounded-xl text-[11px] font-extrabold bg-[#d9ff00] text-[#090c12] hover:brightness-110 transition cursor-pointer text-center">⭐ Оценить</button>
+                      <button type="button" data-move-list-item="${esc(item.id)}" data-target-list="want" title="Вернуть в «Хочу поиграть»" class="py-1.5 px-2 rounded-xl text-[11px] font-semibold bg-white/15 backdrop-blur-md text-white hover:bg-white/25 transition cursor-pointer">↩</button>
+                    ` : `
+                      <button type="button" data-move-list-item="${esc(item.id)}" data-target-list="playing" class="flex-1 py-1.5 px-2 rounded-xl text-[11px] font-bold bg-[#66c0f4]/25 backdrop-blur-md border border-[#66c0f4]/50 text-white hover:bg-[#66c0f4]/40 transition cursor-pointer text-center">▶ Играю</button>
+                      <button type="button" data-rate-from-list="${esc(item.id)}" title="Сразу оценить" class="py-1.5 px-2 rounded-xl text-[11px] font-bold bg-white/15 backdrop-blur-md text-[#d9ff00] hover:bg-white/25 transition cursor-pointer">⭐</button>
+                    `}
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+      if (window.lucide) lucide.createIcons();
+    }
+
     function renderProfileListOnly(animateCards = false) {
       const u = users.find(x => x.steam_id === profileUserId) || currentUser;
       const q = (document.getElementById('profile-search')?.value || '').trim().toLowerCase();
@@ -2542,6 +2766,64 @@
             ? 'На iPhone: нажмите «Поделиться» внизу Safari → «На экран «Домой»»'
             : 'На Android: откройте меню браузера (⋮) → «Установить приложение»');
         }
+        return;
+      }
+      const ptab = e.target.closest('[data-profile-tab]');
+      if (ptab) {
+        profileSubTab = ptab.dataset.profileTab || 'reviews';
+        renderApp(false);
+        return;
+      }
+      const dli = e.target.closest('[data-del-list-item]');
+      if (dli) {
+        const lid = dli.dataset.delListItem;
+        userGameLists = userGameLists.filter(x => x.id !== lid);
+        renderApp(false);
+        showToast('Игра убрана из списка');
+        fetch(`/api/lists/${lid}`, { method: 'DELETE' })
+          .then(r => r.ok ? r.json() : null)
+          .then(d => { if (d && d.lists) userGameLists = d.lists; })
+          .catch(() => {});
+        return;
+      }
+      const mli = e.target.closest('[data-move-list-item]');
+      if (mli) {
+        const lid = mli.dataset.moveListItem;
+        const targetList = mli.dataset.targetList;
+        const item = userGameLists.find(x => x.id === lid);
+        if (item) {
+          item.listType = targetList;
+          item.createdAt = Date.now();
+          renderApp(false);
+          showToast(targetList === 'playing' ? `«${item.gameTitle}» перенесена в «Играю»` : `«${item.gameTitle}» перенесена в «Хочу поиграть»`);
+        }
+        fetch(`/api/lists/${lid}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ listType: targetList })
+        }).then(r => r.ok ? r.json() : null).then(d => { if (d && d.lists) userGameLists = d.lists; }).catch(() => {});
+        return;
+      }
+      const rfl = e.target.closest('[data-rate-from-list]');
+      if (rfl) {
+        const item = userGameLists.find(x => x.id === rfl.dataset.rateFromList);
+        if (!item) return;
+        if (hasUserReviewedGame(item.appId, item.gameTitle)) {
+          showToast('Вы уже оценили эту игру');
+          return;
+        }
+        openEmojiPickerId = null;
+        editingReviewId = null;
+        modalMode = 'review';
+        modalNoNarrative = false;
+        modalScores = { gameplay: 16, visuals: 16, narrative: 16, audio: 16, emotions: 16 };
+        document.getElementById('modal-title').textContent = 'Новый обзор';
+        document.getElementById('modal-subtitle').textContent = `Оценка игры ${item.gameTitle}`;
+        document.getElementById('btn-publish-review').textContent = 'Опубликовать';
+        document.getElementById('input-review-text').value = '';
+        document.getElementById('input-hours').value = '';
+        openModal();
+        openRateStep({ appId: item.appId, title: item.gameTitle, img: item.gameImg });
         return;
       }
       const lom = e.target.closest('[data-open-logout-modal]');
@@ -2780,6 +3062,7 @@
         if (!rev) return;
         openEmojiPickerId = null;
         editingReviewId = null;
+        modalMode = 'review';
         modalScores = { gameplay: 16, visuals: 16, narrative: 16, audio: 16, emotions: 16 };
         modalNoNarrative = Boolean(rev.noNarrative);
         if (modalNoNarrative) {
@@ -2801,6 +3084,7 @@
         if (!rev) return;
         openEmojiPickerId = null;
         editingReviewId = rev.id;
+        modalMode = 'review';
         modalScores = { ...rev.scores };
         modalNoNarrative = Boolean(rev.noNarrative);
         document.getElementById('modal-title').textContent = 'Редактировать обзор';
@@ -3218,6 +3502,32 @@
         navigator.serviceWorker.register('/sw.js').catch(() => {});
       });
     }
+
+    document.getElementById('btn-plist-sort').onclick = () => {
+      profileListSort = profileListSort === 'newest' ? 'alpha' : 'newest';
+      renderApp(false);
+    };
+    document.getElementById('btn-plist-add').onclick = () => {
+      openEmojiPickerId = null;
+      editingReviewId = null;
+      modalMode = profileSubTab === 'playing' ? 'list_playing' : 'list_want';
+      document.getElementById('modal-title').textContent = profileSubTab === 'playing' ? 'Добавить в «Играю»' : 'Добавить в «Хочу поиграть»';
+      document.getElementById('modal-subtitle').textContent = 'Выберите игру из Steam, вашей библиотеки или добавьте стороннюю игру';
+      document.getElementById('btn-start-custom-review').textContent = profileSubTab === 'playing' ? '+ Добавить в «Играю»' : '+ Добавить в «Хочу поиграть»';
+      document.getElementById('custom-game-title').value = '';
+      document.getElementById('custom-game-url').value = '';
+      document.getElementById('custom-game-file').value = '';
+      customCoverDataUrl = '';
+      document.getElementById('custom-game-preview-wrap').classList.add('hidden');
+      setSearchTab('all');
+      openModal();
+      const searchStep = document.getElementById('modal-step-search');
+      searchStep.classList.remove('hidden', 'anim-step-left');
+      void searchStep.offsetWidth;
+      searchStep.classList.add('anim-step-left');
+      document.getElementById('review-form').classList.add('hidden');
+      renderSearchResults(true);
+    };
 
     boot();
   </script>
