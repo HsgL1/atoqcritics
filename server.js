@@ -221,6 +221,18 @@ async function initDb() {
       emoji TEXT NOT NULL,
       PRIMARY KEY (review_id, user_steam_id, emoji)
     );
+
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      recipient_steam_id TEXT NOT NULL REFERENCES users(steam_id) ON DELETE CASCADE,
+      actor_steam_id TEXT NOT NULL REFERENCES users(steam_id) ON DELETE CASCADE,
+      type TEXT NOT NULL,
+      review_id TEXT REFERENCES reviews(id) ON DELETE CASCADE,
+      game_title TEXT,
+      payload TEXT,
+      is_read BOOLEAN DEFAULT FALSE,
+      created_at BIGINT NOT NULL
+    );
   `);
   await pool.query(`
     ALTER TABLE reviews ADD COLUMN IF NOT EXISTS ach_unlocked INTEGER;
@@ -623,6 +635,33 @@ app.post('/api/reviews', requireAuth, async (req, res) => {
       Date.now()
     ]);
 
+    const revInfo = await pool.query('SELECT user_steam_id, game_title FROM reviews WHERE id = $1', [req.params.id]);
+    const revRow = revInfo.rows[0];
+    let parentAuthorId = null;
+    if (replyToId) {
+      const parentRes = await pool.query('SELECT user_steam_id FROM comments WHERE id = $1', [replyToId]);
+      parentAuthorId = parentRes.rows[0] ? parentRes.rows[0].user_steam_id : null;
+      if (parentAuthorId && parentAuthorId !== req.user.steam_id) {
+        await createNotification({
+          recipientSteamId: parentAuthorId,
+          actorSteamId: req.user.steam_id,
+          type: 'reply',
+          reviewId: req.params.id,
+          gameTitle: revRow ? revRow.game_title : '',
+          payload: text.slice(0, 140)
+        });
+      }
+    }
+    if (revRow && revRow.user_steam_id !== req.user.steam_id && revRow.user_steam_id !== parentAuthorId) {
+      await createNotification({
+        recipientSteamId: revRow.user_steam_id,
+        actorSteamId: req.user.steam_id,
+        type: 'comment',
+        reviewId: req.params.id,
+        gameTitle: revRow.game_title,
+        payload: text.slice(0, 140)
+      });
+    }
     res.status(201).json({ id, reviews: await hydrateReviews() });
   } catch (err) {
     res.status(500).json({ error: 'Ошибка сохранения обзора' });
@@ -681,7 +720,7 @@ app.post('/api/reviews/:id/vote', requireAuth, async (req, res) => {
   try {
     const voteVal = Number(req.body && req.body.vote);
     if (voteVal !== 1 && voteVal !== -1) return res.status(400).json({ error: 'Invalid vote' });
-    const revOwner = await pool.query('SELECT user_steam_id FROM reviews WHERE id = $1', [req.params.id]);
+    const revOwner = await pool.query('SELECT user_steam_id, game_title FROM reviews WHERE id = $1', [req.params.id]);
     if (!revOwner.rows[0]) return res.status(404).json({ error: 'Обзор не найден' });
     if (revOwner.rows[0].user_steam_id === req.user.steam_id) {
       return res.status(403).json({ error: 'Нельзя оценивать собственный обзор' });
@@ -695,12 +734,42 @@ app.post('/api/reviews/:id/vote', requireAuth, async (req, res) => {
         VALUES ($1, $2, $3)
         ON CONFLICT (review_id, user_steam_id) DO UPDATE SET vote = EXCLUDED.vote
       `, [req.params.id, req.user.steam_id, voteVal]);
+      await createNotification({
+        recipientSteamId: revOwner.rows[0].user_steam_id,
+        actorSteamId: req.user.steam_id,
+        type: 'vote',
+        reviewId: req.params.id,
+        gameTitle: revOwner.rows[0].game_title,
+        payload: voteVal === 1 ? '👍' : '👎'
+      });
     }
     res.json({ reviews: await hydrateReviews() });
   } catch (err) {
     res.status(500).json({ error: 'Ошибка голосования' });
   }
 });
+
+async function createNotification({ recipientSteamId, actorSteamId, type, reviewId, gameTitle, payload }) {
+  if (!recipientSteamId || !actorSteamId || recipientSteamId === actorSteamId) return;
+  const id = 'n_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+  try {
+    await pool.query(`
+      INSERT INTO notifications (id, recipient_steam_id, actor_steam_id, type, review_id, game_title, payload, is_read, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, $8)
+    `, [
+      id,
+      recipientSteamId,
+      actorSteamId,
+      type,
+      reviewId || null,
+      String(gameTitle || '').slice(0, 150),
+      String(payload || '').slice(0, 180),
+      Date.now()
+    ]);
+  } catch (err) {
+    console.warn('Notification insert error:', err.message);
+  }
+}
 
 const ALLOWED_EMOJIS = ['🔥', '❤️', '😂', '🤯', '💯', '👑', '🐐', '💀', '🤡', '🤮', '😢', '⚡', '🎯', '🫡'];
 
@@ -710,7 +779,7 @@ app.post('/api/reviews/:id/react', requireAuth, async (req, res) => {
     if (!ALLOWED_EMOJIS.includes(emoji)) {
       return res.status(400).json({ error: 'Неподдерживаемый эмодзи' });
     }
-    const revOwner = await pool.query('SELECT user_steam_id FROM reviews WHERE id = $1', [req.params.id]);
+    const revOwner = await pool.query('SELECT user_steam_id, game_title FROM reviews WHERE id = $1', [req.params.id]);
     if (!revOwner.rows[0]) return res.status(404).json({ error: 'Обзор не найден' });
     if (revOwner.rows[0].user_steam_id === req.user.steam_id) {
       return res.status(403).json({ error: 'Нельзя ставить реакции на собственный обзор' });
@@ -729,6 +798,14 @@ app.post('/api/reviews/:id/react', requireAuth, async (req, res) => {
         'INSERT INTO reactions (review_id, user_steam_id, emoji) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
         [req.params.id, req.user.steam_id, emoji]
       );
+      await createNotification({
+        recipientSteamId: revOwner.rows[0].user_steam_id,
+        actorSteamId: req.user.steam_id,
+        type: 'reaction',
+        reviewId: req.params.id,
+        gameTitle: revOwner.rows[0].game_title,
+        payload: emoji
+      });
     }
     res.json({ reviews: await hydrateReviews() });
   } catch (err) {
@@ -764,6 +841,58 @@ app.delete('/api/comments/:id', requireAuth, async (req, res) => {
     res.json({ ok: true, reviews: await hydrateReviews() });
   } catch (err) {
     res.status(500).json({ error: 'Ошибка удаления комментария' });
+  }
+});
+
+app.get('/api/notifications', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT n.*, u.name AS actor_name, u.avatar AS actor_avatar
+      FROM notifications n
+      JOIN users u ON u.steam_id = n.actor_steam_id
+      WHERE n.recipient_steam_id = $1
+      ORDER BY n.created_at DESC
+      LIMIT 40
+    `, [req.user.steam_id]);
+    const notifications = rows.map(n => ({
+      id: n.id,
+      type: n.type,
+      reviewId: n.review_id,
+      gameTitle: n.game_title,
+      payload: n.payload,
+      isRead: Boolean(n.is_read),
+      createdAt: Number(n.created_at),
+      actorId: n.actor_steam_id,
+      actorName: n.actor_name,
+      actorAvatar: n.actor_avatar
+    }));
+    const unreadCount = notifications.filter(n => !n.isRead).length;
+    res.json({ notifications, unreadCount });
+  } catch (err) {
+    res.status(500).json({ error: 'Ошибка загрузки уведомлений' });
+  }
+});
+
+app.post('/api/notifications/read', requireAuth, async (req, res) => {
+  try {
+    const id = req.body && req.body.id ? String(req.body.id) : null;
+    if (id) {
+      await pool.query('UPDATE notifications SET is_read = TRUE WHERE id = $1 AND recipient_steam_id = $2', [id, req.user.steam_id]);
+    } else {
+      await pool.query('UPDATE notifications SET is_read = TRUE WHERE recipient_steam_id = $1 AND is_read = FALSE', [req.user.steam_id]);
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Ошибка обновления уведомлений' });
+  }
+});
+
+app.delete('/api/notifications', requireAuth, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM notifications WHERE recipient_steam_id = $1', [req.user.steam_id]);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Ошибка очистки уведомлений' });
   }
 });
 
