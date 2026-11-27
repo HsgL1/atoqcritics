@@ -227,6 +227,36 @@
     }
     .emoji-btn:hover { transform: scale(1.26) translateY(-2px); background: rgba(255,255,255,0.12); }
     .emoji-btn:active { transform: scale(0.92); }
+  
+    .plist-card-dragging {
+      opacity: 0.28 !important;
+      border: 2px dashed rgba(217, 255, 0, 0.7) !important;
+      transform: scale(0.96) !important;
+    }
+    .plist-card-selected {
+      border-color: #d9ff00 !important;
+      box-shadow: 0 0 0 2px rgba(217, 255, 0, 0.65), 0 12px 30px rgba(217, 255, 0, 0.2) !important;
+      transform: translateY(-3px) scale(1.02) !important;
+    }
+    .plist-drag-ghost {
+      position: fixed;
+      z-index: 95;
+      pointer-events: none;
+      border-radius: 20px;
+      overflow: hidden;
+      border: 2px solid #d9ff00;
+      box-shadow: 0 22px 48px rgba(0, 0, 0, 0.65), 0 0 24px rgba(217, 255, 0, 0.25);
+      transform: scale(1.04) rotate(0.8deg);
+      transition: transform 0.12s ease;
+    }
+    @keyframes plistSwapPop {
+      0% { transform: scale(0.95); }
+      60% { transform: scale(1.025); }
+      100% { transform: scale(1); }
+    }
+    .plist-swap-pop {
+      animation: plistSwapPop 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+    }
   </style>
 </head>
 <body>
@@ -739,7 +769,7 @@
     let currentUser = null, users = [], reviews = [], myLibrary = [], libraryPrivate = false, libraryError = '';
     let notifications = [], notifFilter = 'all', notifOpen = false;
     let gamesCatFilter = 'all', gamesSelectedGenres = new Set(), gamesSelectedTags = new Set(), gamesFiltersOpen = false, gamesShowAllTags = false;
-    let userGameLists = [], profileSubTab = 'reviews', profileListSort = 'newest', modalMode = 'review';
+    let userGameLists = [], profileSubTab = 'reviews', profileListSort = 'custom', selectedSwapListId = null, modalMode = 'review';
     let activeView = 'home', profileUserId = null, searchTab = 'all', selectedGame = null, editingReviewId = null;
     let lastDisplayedGames = [];
     let modalScores = { gameplay: 16, visuals: 16, narrative: 16, audio: 16, emotions: 16 };
@@ -2447,6 +2477,9 @@
       const tempId = 'lst_tmp_' + Date.now();
       // Optimistic add / move
       userGameLists = userGameLists.filter(x => !(x.userId === currentUser.steam_id && (game.appId > 0 ? x.appId === Number(game.appId) : (x.appId === 0 && x.gameTitle.toLowerCase() === game.title.trim().toLowerCase()))));
+      const minOrd = userGameLists
+        .filter(x => x.userId === currentUser.steam_id && x.listType === listType)
+        .reduce((m, x) => Math.min(m, Number(x.sortOrder) || 0), 1);
       userGameLists.unshift({
         id: tempId,
         userId: currentUser.steam_id,
@@ -2454,6 +2487,7 @@
         appId: Number(game.appId) || 0,
         gameTitle: game.title,
         gameImg: game.img || '',
+        sortOrder: minOrd - 1,
         createdAt: Date.now()
       });
       closeModal();
@@ -2468,6 +2502,7 @@
           userGameLists = d.lists;
           const realId = d.id || (d.item && d.item.id);
           if (realId) {
+            document.querySelectorAll(`[data-list-card-id="${tempId}"]`).forEach(el => { el.dataset.listCardId = realId; });
             document.querySelectorAll(`[data-del-list-item="${tempId}"]`).forEach(el => { el.dataset.delListItem = realId; });
             document.querySelectorAll(`[data-move-list-item="${tempId}"]`).forEach(el => { el.dataset.moveListItem = realId; });
             document.querySelectorAll(`[data-rate-from-list="${tempId}"]`).forEach(el => { el.dataset.rateFromList = realId; });
@@ -2655,10 +2690,11 @@
         return;
       }
 
+      selectedSwapListId = null;
       const isPlaying = profileSubTab === 'playing';
       const items = [...(isPlaying ? playingItems : wantItems)];
       if (profileListSort === 'alpha') items.sort((a, b) => a.gameTitle.localeCompare(b.gameTitle));
-      else items.sort((a, b) => b.createdAt - a.createdAt);
+      else items.sort((a, b) => ((a.sortOrder ?? 0) - (b.sortOrder ?? 0)) || (b.createdAt - a.createdAt));
 
       const iconBox = document.getElementById('plist-icon-box');
       iconBox.className = isPlaying
@@ -2669,10 +2705,13 @@
         : '<i data-lucide="clock" class="w-4 h-4"></i>';
 
       document.getElementById('plist-title').textContent = isPlaying ? 'Играю сейчас' : 'Хочу поиграть';
-      document.getElementById('plist-subtitle').textContent = isPlaying
+      const reorderHint = (isOwnProf && items.length > 1)
+        ? (isTouchDevice() ? ' · зажмите карточку, чтобы поменять местами' : ' · кликните или перетащите для сортировки')
+        : '';
+      document.getElementById('plist-subtitle').textContent = (isPlaying
         ? `Игр в процессе прохождения: ${items.length}`
-        : `Игр в списке желаемого: ${items.length}`;
-      document.getElementById('plist-sort-label').textContent = profileListSort === 'alpha' ? 'А–Я' : 'Новые';
+        : `Игр в списке желаемого: ${items.length}`) + reorderHint;
+      document.getElementById('plist-sort-label').textContent = profileListSort === 'alpha' ? 'А–Я' : 'По порядку';
 
       const addBtn = document.getElementById('btn-plist-add');
       addBtn.classList.toggle('hidden', !isOwnProf);
@@ -2690,16 +2729,17 @@
           : (item.gameImg || makeVerticalFallbackPoster(item.gameTitle));
         const delay = Math.min(idx * 25, 220);
         return `
-          <div class="group relative rounded-[20px] overflow-hidden border border-white/15 bg-[#101724] shadow-lg transition hover:-translate-y-1 hover:border-white/30 ${animateCards ? 'anim-game-item' : ''}" ${animateCards ? `style="animation-delay:${delay}ms;"` : ''}>
+          <div data-list-card-id="${esc(item.id)}" class="group relative rounded-[20px] overflow-hidden border border-white/15 bg-[#101724] shadow-lg transition hover:-translate-y-1 hover:border-white/30 ${isOwnProf ? 'cursor-grab active:cursor-grabbing select-none' : ''} ${animateCards ? 'anim-game-item' : ''}" ${animateCards ? `style="animation-delay:${delay}ms;"` : ''}>
             <div class="aspect-[2/3] w-full relative overflow-hidden bg-[#0e1420]">
               <img
                 src="${esc(posterUrl)}"
+                draggable="false"
                 data-appid="${item.appId}"
                 data-header-img="${esc(item.gameImg || '')}"
                 onload="handlePosterLoad(this)"
                 onerror="handlePosterError(this)"
                 alt="${esc(item.gameTitle)}"
-                class="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                class="w-full h-full object-cover group-hover:scale-105 transition duration-300 pointer-events-none select-none"
               />
               <div class="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[#090c12] via-[#090c12]/80 to-transparent pointer-events-none"></div>
 
@@ -3539,9 +3579,246 @@
     }
 
     document.getElementById('btn-plist-sort').onclick = () => {
-      profileListSort = profileListSort === 'newest' ? 'alpha' : 'newest';
+      profileListSort = profileListSort === 'alpha' ? 'custom' : 'alpha';
       renderApp(false);
     };
+
+    // ===== REORDER GAMES IN WANT / PLAYING (Desktop: Click-to-Swap OR Drag; Mobile: Long-Press Drag) =====
+    (function setupProfileListReorder() {
+      const grid = document.getElementById('profile-list-grid');
+      if (!grid) return;
+
+      let pressTimer = null;
+      let activeCard = null;
+      let ghostEl = null;
+      let pointerId = null;
+      let pointerType = '';
+      let startX = 0, startY = 0;
+      let offsetX = 0, offsetY = 0;
+      let isDragging = false;
+      let didDrag = false;
+      let orderChanged = false;
+      let autoScrollRaf = null;
+      let lastClientY = 0;
+
+      function isOwnListActive() {
+        return activeView === 'profile'
+          && (profileSubTab === 'want' || profileSubTab === 'playing')
+          && currentUser
+          && (!profileUserId || profileUserId === currentUser.steam_id);
+      }
+
+      function clearSwapSelection() {
+        if (!selectedSwapListId) return;
+        grid.querySelectorAll('.plist-card-selected').forEach(el => el.classList.remove('plist-card-selected'));
+        selectedSwapListId = null;
+      }
+
+      function persistGridOrder() {
+        const listType = profileSubTab === 'playing' ? 'playing' : 'want';
+        const orderedIds = Array.from(grid.querySelectorAll('[data-list-card-id]'))
+          .map(el => el.dataset.listCardId)
+          .filter(Boolean);
+        if (!orderedIds.length) return;
+        const orderMap = new Map(orderedIds.map((id, idx) => [id, idx]));
+        userGameLists.forEach(item => {
+          if (item.userId === currentUser.steam_id && item.listType === listType && orderMap.has(item.id)) {
+            item.sortOrder = orderMap.get(item.id);
+          }
+        });
+        profileListSort = 'custom';
+        const lbl = document.getElementById('plist-sort-label');
+        if (lbl) lbl.textContent = 'По порядку';
+        fetch('/api/lists/reorder', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ listType, orderedIds })
+        }).catch(() => {});
+      }
+
+      function swapDomCards(cardA, cardB) {
+        if (!cardA || !cardB || cardA === cardB || cardA.parentNode !== grid || cardB.parentNode !== grid) return;
+        const nextA = cardA.nextSibling;
+        const nextB = cardB.nextSibling;
+        if (nextA === cardB) {
+          grid.insertBefore(cardB, cardA);
+        } else if (nextB === cardA) {
+          grid.insertBefore(cardA, cardB);
+        } else {
+          grid.insertBefore(cardA, nextB);
+          grid.insertBefore(cardB, nextA);
+        }
+        [cardA, cardB].forEach(c => {
+          c.classList.remove('plist-swap-pop');
+          void c.offsetWidth;
+          c.classList.add('plist-swap-pop');
+        });
+        persistGridOrder();
+      }
+
+      function startDrag(card, clientX, clientY) {
+        if (!card || isDragging) return;
+        clearSwapSelection();
+        isDragging = true;
+        didDrag = true;
+        orderChanged = false;
+        const rect = card.getBoundingClientRect();
+        offsetX = clientX - rect.left;
+        offsetY = clientY - rect.top;
+        lastClientY = clientY;
+
+        ghostEl = card.cloneNode(true);
+        ghostEl.removeAttribute('data-list-card-id');
+        ghostEl.classList.remove('anim-game-item', 'plist-card-selected', 'hover:-translate-y-1');
+        ghostEl.classList.add('plist-drag-ghost');
+        ghostEl.style.width = rect.width + 'px';
+        ghostEl.style.height = rect.height + 'px';
+        ghostEl.style.left = rect.left + 'px';
+        ghostEl.style.top = rect.top + 'px';
+        document.body.appendChild(ghostEl);
+
+        card.classList.add('plist-card-dragging');
+        if (pointerType === 'touch' && navigator.vibrate) {
+          try { navigator.vibrate(18); } catch {}
+        }
+        runAutoScroll();
+      }
+
+      function runAutoScroll() {
+        if (!isDragging) return;
+        const edge = 75;
+        const vh = window.innerHeight;
+        if (lastClientY < edge) window.scrollBy(0, -Math.ceil((edge - lastClientY) / 5));
+        else if (lastClientY > vh - edge) window.scrollBy(0, Math.ceil((lastClientY - (vh - edge)) / 5));
+        autoScrollRaf = requestAnimationFrame(runAutoScroll);
+      }
+
+      function moveDrag(clientX, clientY) {
+        if (!isDragging || !ghostEl || !activeCard) return;
+        lastClientY = clientY;
+        ghostEl.style.left = (clientX - offsetX) + 'px';
+        ghostEl.style.top = (clientY - offsetY) + 'px';
+
+        const elUnder = document.elementFromPoint(clientX, clientY);
+        const targetCard = elUnder && elUnder.closest ? elUnder.closest('[data-list-card-id]') : null;
+        if (targetCard && targetCard !== activeCard && targetCard.parentNode === grid) {
+          const children = Array.from(grid.children);
+          const dragIdx = children.indexOf(activeCard);
+          const targetIdx = children.indexOf(targetCard);
+          if (dragIdx !== -1 && targetIdx !== -1) {
+            if (dragIdx < targetIdx) grid.insertBefore(activeCard, targetCard.nextSibling);
+            else grid.insertBefore(activeCard, targetCard);
+            orderChanged = true;
+          }
+        }
+      }
+
+      function endDrag() {
+        clearTimeout(pressTimer);
+        pressTimer = null;
+        if (autoScrollRaf) { cancelAnimationFrame(autoScrollRaf); autoScrollRaf = null; }
+        if (ghostEl) { ghostEl.remove(); ghostEl = null; }
+        if (activeCard) {
+          activeCard.classList.remove('plist-card-dragging');
+          if (isDragging && orderChanged) {
+            activeCard.classList.remove('plist-swap-pop');
+            void activeCard.offsetWidth;
+            activeCard.classList.add('plist-swap-pop');
+            persistGridOrder();
+          }
+        }
+        isDragging = false;
+        activeCard = null;
+        pointerId = null;
+        orderChanged = false;
+      }
+
+      grid.addEventListener('pointerdown', e => {
+        if (!isOwnListActive()) return;
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        if (e.target.closest('button')) return;
+        const card = e.target.closest('[data-list-card-id]');
+        if (!card) return;
+        if (grid.querySelectorAll('[data-list-card-id]').length < 2) return;
+
+        activeCard = card;
+        pointerId = e.pointerId;
+        pointerType = e.pointerType;
+        startX = e.clientX;
+        startY = e.clientY;
+        didDrag = false;
+        orderChanged = false;
+
+        if (pointerType === 'touch') {
+          clearTimeout(pressTimer);
+          pressTimer = setTimeout(() => {
+            if (activeCard) startDrag(activeCard, startX, startY);
+          }, 260);
+        }
+      });
+
+      window.addEventListener('pointermove', e => {
+        if (!activeCard || e.pointerId !== pointerId) return;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        if (!isDragging) {
+          if (pointerType === 'touch') {
+            if (Math.hypot(dx, dy) > 8) {
+              clearTimeout(pressTimer);
+              pressTimer = null;
+              activeCard = null;
+              pointerId = null;
+            }
+            return;
+          }
+          if (Math.hypot(dx, dy) > 6) {
+            startDrag(activeCard, e.clientX, e.clientY);
+          } else {
+            return;
+          }
+        }
+        moveDrag(e.clientX, e.clientY);
+      }, { passive: true });
+
+      // Prevent native page scroll on mobile ONLY while actively dragging a card
+      window.addEventListener('touchmove', e => {
+        if (isDragging) e.preventDefault();
+      }, { passive: false });
+
+      window.addEventListener('pointerup', e => {
+        if (pointerId !== null && e.pointerId !== pointerId) return;
+        const wasDragging = isDragging;
+        const releasedCard = activeCard;
+        const pType = pointerType;
+        endDrag();
+        // Desktop click-to-swap: quick click on card A, then click on card B swaps them!
+        if (!wasDragging && !didDrag && pType !== 'touch' && releasedCard && isOwnListActive()) {
+          const cid = releasedCard.dataset.listCardId;
+          if (!cid) return;
+          if (!selectedSwapListId) {
+            selectedSwapListId = cid;
+            releasedCard.classList.add('plist-card-selected');
+          } else if (selectedSwapListId === cid) {
+            clearSwapSelection();
+          } else {
+            const firstCard = grid.querySelector(`[data-list-card-id="${CSS.escape(selectedSwapListId)}"]`);
+            clearSwapSelection();
+            if (firstCard) swapDomCards(firstCard, releasedCard);
+          }
+        }
+      });
+
+      window.addEventListener('pointercancel', () => endDrag());
+      grid.addEventListener('contextmenu', e => {
+        if (isDragging || pressTimer) e.preventDefault();
+      });
+      document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') clearSwapSelection();
+      });
+      document.addEventListener('click', e => {
+        if (selectedSwapListId && !e.target.closest('#profile-list-grid')) clearSwapSelection();
+      });
+    })();
     document.getElementById('btn-plist-add').onclick = () => {
       openEmojiPickerId = null;
       editingReviewId = null;
