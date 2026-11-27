@@ -1750,12 +1750,29 @@
       return '#home';
     }
 
+    let guardUserGestureArmed = false;
+
+    function armBackGuardOnGesture() {
+      if (guardUserGestureArmed || !currentUser) return;
+      guardUserGestureArmed = true;
+      const hash = buildCurrentHash();
+      try {
+        if (!history.state || !history.state.atoq || history.state.guard) {
+          history.replaceState({ atoq: true, guard: true, hash }, '', hash);
+          history.pushState({ atoq: true, hash }, '', hash);
+        }
+      } catch {}
+    }
+
+    ['pointerdown', 'touchstart', 'keydown'].forEach(evt => {
+      window.addEventListener(evt, armBackGuardOnGesture, { once: true, passive: true });
+    });
+
     function saveCurrentRoute(replaceOnly = false) {
       const hash = buildCurrentHash();
       try {
         if (!routeHistoryPrimed) {
           routeHistoryPrimed = true;
-          // Guard entry at the very bottom of history so Back / swipe-back never closes the site
           history.replaceState({ atoq: true, guard: true, hash }, '', hash);
           history.pushState({ atoq: true, hash }, '', hash);
         } else if (!isHandlingPopState && window.location.hash !== hash) {
@@ -1803,8 +1820,8 @@
         try { history.pushState({ atoq: true, hash: stayHash }, '', stayHash); } catch {}
         return;
       }
-      // 2. If we hit the bottom guard entry, stay on the current page without closing the site
-      if (e.state && e.state.guard) {
+      // 2. If we hit the bottom guard entry (or pre-init null state), stay on the current page without closing the site
+      if (!e.state || e.state.guard) {
         const stayHash = buildCurrentHash();
         try { history.pushState({ atoq: true, hash: stayHash }, '', stayHash); } catch {}
         return;
