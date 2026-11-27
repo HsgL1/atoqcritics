@@ -522,13 +522,17 @@ async function fetchMetacriticBest(appId, gameTitle) {
   return await fetchMetacriticFromWebJsonLd(gameTitle);
 }
 
+let openCriticRateLimitedUntil = 0;
+
 async function fetchOpenCriticByTitle(gameTitle) {
   const cleanQuery = String(gameTitle || '').replace(/[™®©]/g, '').trim();
   if (cleanQuery.length < 2) return null;
+  if (Date.now() < openCriticRateLimitedUntil) return null;
 
   const hosts = [];
   if (OPENCRITIC_API_KEY) {
     hosts.push({
+      name: 'rapidapi',
       base: 'https://opencritic-api.p.rapidapi.com',
       headers: {
         'x-rapidapi-key': OPENCRITIC_API_KEY,
@@ -538,6 +542,7 @@ async function fetchOpenCriticByTitle(gameTitle) {
     });
   }
   hosts.push({
+    name: 'direct',
     base: 'https://api.opencritic.com/api',
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
@@ -548,7 +553,29 @@ async function fetchOpenCriticByTitle(gameTitle) {
 
   const normTarget = normalizeTitleForMatch(cleanQuery);
   for (const h of hosts) {
-    const results = await fetchJsonWithTimeout(`${h.base}/game/search?criteria=${encodeURIComponent(cleanQuery)}`, h.headers, 5000);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5500);
+    let results = null;
+    try {
+      const res = await fetch(`${h.base}/game/search?criteria=${encodeURIComponent(cleanQuery)}`, {
+        signal: controller.signal,
+        headers: h.headers
+      });
+      clearTimeout(timer);
+      if (res.status === 429 && h.name === 'rapidapi') {
+        console.warn('[OpenCritic] RapidAPI daily quota reached (429), pausing auto OC searches for 6h.');
+        openCriticRateLimitedUntil = Date.now() + 6 * 60 * 60 * 1000;
+        continue;
+      }
+      if (!res.ok) {
+        if (h.name === 'rapidapi') console.warn(`[OpenCritic] RapidAPI search status ${res.status} for "${cleanQuery}"`);
+        continue;
+      }
+      results = await res.json();
+    } catch {
+      clearTimeout(timer);
+      continue;
+    }
     if (!Array.isArray(results) || !results.length) continue;
 
     let best = results.find(x => normalizeTitleForMatch(x.name) === normTarget);
@@ -556,12 +583,12 @@ async function fetchOpenCriticByTitle(gameTitle) {
       const n = normalizeTitleForMatch(x.name);
       return n.includes(normTarget) || normTarget.includes(n);
     });
-    if (!best && results[0] && (results[0].dist === undefined || Number(results[0].dist) <= 0.16)) {
+    if (!best && results[0] && (results[0].dist === undefined || Number(results[0].dist) <= 0.18)) {
       best = results[0];
     }
     if (!best || !best.id) continue;
 
-    const detail = await fetchJsonWithTimeout(`${h.base}/game/${best.id}`, h.headers, 5000);
+    const detail = await fetchJsonWithTimeout(`${h.base}/game/${best.id}`, h.headers, 5500);
     const rawScore = Number(detail && detail.topCriticScore);
     if (!Number.isFinite(rawScore) || rawScore < 0) continue;
     const slug = slugifyGameTitle(detail.name || best.name || 'game') || 'game';
@@ -574,11 +601,12 @@ async function fetchOpenCriticByTitle(gameTitle) {
   return null;
 }
 
-async function ensureExternalRatings(appId, gameTitle, force = false) {
+async function ensureExternalRatings(appId, gameTitle, force = false, opts = {}) {
   const numAppId = Number(appId) || 0;
   const cleanTitle = String(gameTitle || '').trim();
   if (numAppId <= 0 && !cleanTitle) return null;
   const gKey = numAppId > 0 ? `steam_${numAppId}` : `custom_${cleanTitle.toLowerCase()}`;
+  const allowOc = opts.allowOc !== false;
 
   try {
     const existing = await pool.query('SELECT * FROM game_external_ratings WHERE game_key = $1', [gKey]);
@@ -591,17 +619,17 @@ async function ensureExternalRatings(appId, gameTitle, force = false) {
     }
 
     const needMc = force || !row || row.mc_score === null;
-    const needOc = force || !row || row.oc_score === null;
+    const needOc = allowOc && (force || !row || row.oc_score === null);
     const [mc, oc] = await Promise.all([
       needMc ? fetchMetacriticBest(numAppId, cleanTitle) : Promise.resolve(null),
       needOc ? fetchOpenCriticByTitle(cleanTitle) : Promise.resolve(null)
     ]);
 
-    const finalMcScore = mc ? mc.score : (row && !force ? row.mc_score : null);
-    const finalMcUrl = mc ? mc.url : (row && !force ? row.mc_url : null);
-    const finalOcScore = oc ? oc.score : (row && !force ? row.oc_score : null);
-    const finalOcTier = oc ? oc.tier : (row && !force ? row.oc_tier : null);
-    const finalOcUrl = oc ? oc.url : (row && !force ? row.oc_url : null);
+    const finalMcScore = mc ? mc.score : (row ? row.mc_score : null);
+    const finalMcUrl = mc ? mc.url : (row ? row.mc_url : null);
+    const finalOcScore = oc ? oc.score : (row ? row.oc_score : null);
+    const finalOcTier = oc ? oc.tier : (row ? row.oc_tier : null);
+    const finalOcUrl = oc ? oc.url : (row ? row.oc_url : null);
 
     await pool.query(`
       INSERT INTO game_external_ratings (game_key, app_id, game_title, mc_score, mc_url, oc_score, oc_tier, oc_url, manual_override, updated_at)
@@ -624,30 +652,51 @@ async function ensureExternalRatings(appId, gameTitle, force = false) {
       ocTier: finalOcTier,
       ocUrl: finalOcUrl
     };
-  } catch {
+  } catch (err) {
+    console.error('[ExternalRatings] ensureExternalRatings error:', err.message);
     return null;
   }
 }
 
 async function backfillExternalRatings() {
   try {
+    console.log(`[ExternalRatings] Backfill start (RAWG: ${RAWG_API_KEY ? 'ON' : 'OFF'}, OpenCritic: ${OPENCRITIC_API_KEY ? 'ON' : 'OFF'})`);
     const { rows } = await pool.query(`
-      SELECT DISTINCT ON (gkey) app_id, game_title, gkey, latest_at
+      SELECT app_id, game_title, gkey, has_mc, has_oc
       FROM (
-        SELECT r.app_id, r.game_title, r.created_at AS latest_at,
-          CASE WHEN r.app_id > 0 THEN 'steam_' || r.app_id::text ELSE 'custom_' || LOWER(TRIM(r.game_title)) END AS gkey
-        FROM reviews r
-      ) sub
-      LEFT JOIN game_external_ratings er ON er.game_key = sub.gkey
-      WHERE er.game_key IS NULL OR (er.manual_override IS NOT TRUE AND (er.mc_score IS NULL OR er.oc_score IS NULL))
-      ORDER BY gkey, latest_at DESC
-      LIMIT 40
+        SELECT DISTINCT ON (sub.gkey)
+          sub.app_id,
+          sub.game_title,
+          sub.gkey,
+          sub.latest_at,
+          (er.mc_score IS NOT NULL) AS has_mc,
+          (er.oc_score IS NOT NULL) AS has_oc
+        FROM (
+          SELECT r.app_id, r.game_title, r.created_at AS latest_at,
+            CASE WHEN r.app_id > 0 THEN 'steam_' || r.app_id::text ELSE 'custom_' || LOWER(TRIM(r.game_title)) END AS gkey
+          FROM reviews r
+        ) sub
+        LEFT JOIN game_external_ratings er ON er.game_key = sub.gkey
+        WHERE er.game_key IS NULL OR (er.manual_override IS NOT TRUE AND (er.mc_score IS NULL OR er.oc_score IS NULL))
+        ORDER BY sub.gkey, sub.latest_at DESC
+      ) t
+      ORDER BY latest_at DESC
+      LIMIT 160
     `);
+    console.log(`[ExternalRatings] Found ${rows.length} games needing MC/OC lookup.`);
+    let ocCalls = 0;
+    const MAX_OC_AUTO_CALLS = OPENCRITIC_API_KEY ? 22 : 12;
     for (const row of rows) {
-      await ensureExternalRatings(row.app_id, row.game_title, true);
-      await new Promise(res => setTimeout(res, 750));
+      const wantOc = !row.has_oc && ocCalls < MAX_OC_AUTO_CALLS && Date.now() >= openCriticRateLimitedUntil;
+      if (wantOc) ocCalls++;
+      if (row.has_mc && !wantOc) continue;
+      await ensureExternalRatings(row.app_id, row.game_title, false, { allowOc: wantOc });
+      await new Promise(res => setTimeout(res, 550));
     }
-  } catch {}
+    console.log(`[ExternalRatings] Backfill finished (OC lookups: ${ocCalls}).`);
+  } catch (err) {
+    console.error('[ExternalRatings] Backfill SQL/run error:', err.message);
+  }
 }
 
 // ==================== EXPRESS APP ====================
