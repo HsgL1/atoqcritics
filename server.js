@@ -359,6 +359,7 @@ async function initDb() {
     ALTER TABLE game_tags ADD COLUMN IF NOT EXISTS user_tags_json TEXT;
     ALTER TABLE user_game_lists ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0;
     ALTER TABLE custom_game_meta ADD COLUMN IF NOT EXISTS labels_json TEXT;
+    ALTER TABLE game_external_ratings ADD COLUMN IF NOT EXISTS mc_version INTEGER DEFAULT 1;
   `);
   console.log('Облачная база PostgreSQL подключена и таблицы готовы.');
   // Backfill achievements for existing reviews in background
@@ -469,22 +470,65 @@ async function fetchMetacriticFromSteam(appId) {
   return null;
 }
 
+function isTargetMcPlatform(entry) {
+  const p = entry && entry.platform;
+  const text = `${p?.slug || ''} ${p?.name || ''} ${entry?.url || ''}`.toLowerCase();
+  return text.includes('pc')
+    || text.includes('playstation')
+    || /ps[1-5]/.test(text)
+    || text.includes('xbox');
+}
+
 async function fetchMetacriticFromRawg(gameTitle) {
   if (!RAWG_API_KEY) return null;
   const cleanQuery = String(gameTitle || '').replace(/[™®©]/g, '').trim();
   if (cleanQuery.length < 2) return null;
   const url = `https://api.rawg.io/api/games?key=${encodeURIComponent(RAWG_API_KEY)}&search=${encodeURIComponent(cleanQuery)}&page_size=5`;
-  const data = await fetchJsonWithTimeout(url, { 'User-Agent': 'AToQcritics/1.0' }, 5000);
+  const data = await fetchJsonWithTimeout(url, { 'User-Agent': 'AToQcritics/1.0' }, 5500);
   const results = data && Array.isArray(data.results) ? data.results : [];
   if (!results.length) return null;
   const normTarget = normalizeTitleForMatch(cleanQuery);
   let best = results.find(x => normalizeTitleForMatch(x.name) === normTarget && Number(x.metacritic) > 0);
   if (!best) best = results.find(x => Number(x.metacritic) > 0 && (normalizeTitleForMatch(x.name).includes(normTarget) || normTarget.includes(normalizeTitleForMatch(x.name))));
-  if (!best || !Number(best.metacritic)) return null;
-  const slug = slugifyGameTitle(best.name || cleanQuery);
+  if (!best) best = results.find(x => normalizeTitleForMatch(x.name) === normTarget);
+  if (!best || !best.id) return null;
+
+  // Fetch full game details to get per-platform Metacritic scores (PC + PlayStation + Xbox)
+  const detail = await fetchJsonWithTimeout(
+    `https://api.rawg.io/api/games/${best.id}?key=${encodeURIComponent(RAWG_API_KEY)}`,
+    { 'User-Agent': 'AToQcritics/1.0' },
+    5500
+  );
+
+  const mcPlatforms = Array.isArray(detail && detail.metacritic_platforms) ? detail.metacritic_platforms : [];
+  const filteredScores = mcPlatforms
+    .filter(isTargetMcPlatform)
+    .map(x => Number(x.metascore))
+    .filter(n => Number.isFinite(n) && n > 0 && n <= 100);
+
+  let finalScore = null;
+  if (filteredScores.length > 0) {
+    finalScore = Math.round(filteredScores.reduce((a, b) => a + b, 0) / filteredScores.length);
+  } else {
+    const fallbackAll = mcPlatforms
+      .map(x => Number(x.metascore))
+      .filter(n => Number.isFinite(n) && n > 0 && n <= 100);
+    if (fallbackAll.length > 0) {
+      finalScore = Math.round(fallbackAll.reduce((a, b) => a + b, 0) / fallbackAll.length);
+    } else {
+      const overall = Number((detail && detail.metacritic) || best.metacritic);
+      if (Number.isFinite(overall) && overall > 0 && overall <= 100) {
+        finalScore = Math.round(overall);
+      }
+    }
+  }
+
+  if (finalScore === null) return null;
+  const slug = slugifyGameTitle((detail && detail.name) || best.name || cleanQuery);
+  const mcUrl = (detail && detail.metacritic_url) || (slug ? `https://www.metacritic.com/game/${slug}/` : null);
   return {
-    score: Math.min(100, Math.max(0, Math.round(Number(best.metacritic)))),
-    url: slug ? `https://www.metacritic.com/game/${slug}/` : null
+    score: Math.min(100, Math.max(0, finalScore)),
+    url: mcUrl
   };
 }
 
@@ -525,10 +569,12 @@ async function fetchMetacriticFromWebJsonLd(gameTitle) {
 }
 
 async function fetchMetacriticBest(appId, gameTitle) {
-  const fromSteam = await fetchMetacriticFromSteam(appId);
-  if (fromSteam) return fromSteam;
+  // Primary: RAWG multi-platform arithmetic mean (PC + PlayStation + Xbox)
   const fromRawg = await fetchMetacriticFromRawg(gameTitle);
   if (fromRawg) return fromRawg;
+  // Fallback: Steam PC Metacritic, then Metacritic JSON-LD
+  const fromSteam = await fetchMetacriticFromSteam(appId);
+  if (fromSteam) return fromSteam;
   return await fetchMetacriticFromWebJsonLd(gameTitle);
 }
 
@@ -621,14 +667,15 @@ async function ensureExternalRatings(appId, gameTitle, force = false, opts = {})
   try {
     const existing = await pool.query('SELECT * FROM game_external_ratings WHERE game_key = $1', [gKey]);
     const row = existing.rows[0];
-    const hasBoth = row && row.mc_score !== null && row.oc_score !== null;
+    const isUpToDateMc = row && Number(row.mc_version || 1) >= 2;
+    const hasBoth = row && row.mc_score !== null && row.oc_score !== null && isUpToDateMc;
     const FRESH_MS = hasBoth ? (14 * 24 * 60 * 60 * 1000) : (6 * 60 * 60 * 1000);
     if (row && !force) {
       if (row.manual_override) return row;
-      if ((Date.now() - Number(row.updated_at || 0)) < FRESH_MS) return row;
+      if (isUpToDateMc && (Date.now() - Number(row.updated_at || 0)) < FRESH_MS) return row;
     }
 
-    const needMc = force || !row || row.mc_score === null;
+    const needMc = force || !row || row.mc_score === null || !isUpToDateMc;
     const needOc = allowOc && (force || !row || row.oc_score === null);
     const [mc, oc] = await Promise.all([
       needMc ? fetchMetacriticBest(numAppId, cleanTitle) : Promise.resolve(null),
@@ -642,8 +689,8 @@ async function ensureExternalRatings(appId, gameTitle, force = false, opts = {})
     const finalOcUrl = oc ? oc.url : (row ? row.oc_url : null);
 
     await pool.query(`
-      INSERT INTO game_external_ratings (game_key, app_id, game_title, mc_score, mc_url, oc_score, oc_tier, oc_url, manual_override, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, FALSE, $9)
+      INSERT INTO game_external_ratings (game_key, app_id, game_title, mc_score, mc_url, oc_score, oc_tier, oc_url, manual_override, mc_version, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, FALSE, 2, $9)
       ON CONFLICT (game_key) DO UPDATE SET
         game_title = EXCLUDED.game_title,
         mc_score = EXCLUDED.mc_score,
@@ -652,6 +699,7 @@ async function ensureExternalRatings(appId, gameTitle, force = false, opts = {})
         oc_tier = EXCLUDED.oc_tier,
         oc_url = EXCLUDED.oc_url,
         manual_override = FALSE,
+        mc_version = 2,
         updated_at = EXCLUDED.updated_at
     `, [gKey, numAppId, cleanTitle, finalMcScore, finalMcUrl, finalOcScore, finalOcTier, finalOcUrl, Date.now()]);
 
@@ -679,7 +727,7 @@ async function backfillExternalRatings() {
           sub.game_title,
           sub.gkey,
           sub.latest_at,
-          (er.mc_score IS NOT NULL) AS has_mc,
+          (er.mc_score IS NOT NULL AND COALESCE(er.mc_version, 1) >= 2) AS has_mc,
           (er.oc_score IS NOT NULL) AS has_oc
         FROM (
           SELECT r.app_id, r.game_title, r.created_at AS latest_at,
@@ -687,7 +735,7 @@ async function backfillExternalRatings() {
           FROM reviews r
         ) sub
         LEFT JOIN game_external_ratings er ON er.game_key = sub.gkey
-        WHERE er.game_key IS NULL OR (er.manual_override IS NOT TRUE AND (er.mc_score IS NULL OR er.oc_score IS NULL))
+        WHERE er.game_key IS NULL OR (er.manual_override IS NOT TRUE AND (er.mc_score IS NULL OR COALESCE(er.mc_version, 1) < 2 OR er.oc_score IS NULL))
         ORDER BY sub.gkey, sub.latest_at DESC
       ) t
       ORDER BY latest_at DESC
