@@ -16,7 +16,7 @@
   <style>
     :root { --bg-obsidian: #090c12; --accent-lime: #d9ff00; --accent-steam: #66c0f4; }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    html, body { margin: 0; font-family: 'Inter', sans-serif; background: var(--bg-obsidian); color: #f1f5f9; min-height: 100vh; overflow-x: clip; }
+    html, body { margin: 0; font-family: 'Inter', sans-serif; background: var(--bg-obsidian); color: #f1f5f9; min-height: 100vh; overflow-x: clip; overscroll-behavior-x: none; }
     .ambient-bg {
       position: fixed; top: -60px; bottom: -140px; left: 0; right: 0; z-index: 0; pointer-events: none;
       transform: translate3d(0, 0, 0);
@@ -1739,15 +1739,14 @@
       try {
         if (!routeHistoryPrimed) {
           routeHistoryPrimed = true;
+          // Sentinel guard on #home so Back / mobile swipe-back never closes the site even on Главная
+          history.replaceState({ atoq: true, guard: true, hash: '#home' }, '', '#home');
+          history.pushState({ atoq: true, hash: '#home' }, '', '#home');
           if (hash !== '#home') {
-            // Prime #home underneath so browser Back / mobile swipe-back always lands on Главная instead of closing the site
-            history.replaceState({ atoq: true, hash: '#home' }, '', '#home');
             history.pushState({ atoq: true, hash }, '', hash);
-          } else {
-            history.replaceState({ atoq: true, hash: '#home' }, '', '#home');
           }
         } else if (!isHandlingPopState && window.location.hash !== hash) {
-          if (replaceOnly || hash === '#home') {
+          if (replaceOnly) {
             history.replaceState({ atoq: true, hash }, '', hash);
           } else {
             history.pushState({ atoq: true, hash }, '', hash);
@@ -1797,13 +1796,18 @@
         activeView = 'home';
         openEmojiPickerId = null;
         try {
-          history.replaceState({ atoq: true, hash: '#home' }, '', '#home');
+          history.pushState({ atoq: true, hash: '#home' }, '', '#home');
           localStorage.setItem('atoq_last_route', '#home');
         } catch {}
         renderApp(true);
         window.scrollTo({ top: 0, behavior: 'smooth' });
         isHandlingPopState = false;
+        return;
       }
+      // 3. Already on Главная: re-push guard so Back / swipe-back does not close the site
+      try {
+        history.pushState({ atoq: true, hash: '#home' }, '', '#home');
+      } catch {}
     });
 
     function renderApp(animateCards = false) {
