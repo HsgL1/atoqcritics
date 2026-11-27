@@ -632,7 +632,8 @@
       }
 
       profileUserId = currentUser.steam_id;
-      // Load users & reviews BEFORE revealing the page so Home stats appear populated immediately
+      restoreSavedRoute();
+      // Load users & reviews BEFORE revealing the page so current tab appears populated immediately
       await Promise.all([loadUsers(), loadReviews()]);
       renderApp(true);
       document.getElementById('boot-loader').classList.add('hidden');
@@ -872,8 +873,8 @@
               rows="1"
               maxlength="800"
               required
-              placeholder="${replyTarget ? `Ответить ${esc(replyTarget.author)}...` : 'Комментарий...'}"
-              class="comment-autogrow flex-1 min-w-0 w-full px-3.5 py-2 rounded-2xl bg-white/[0.09] border border-white/15 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#66c0f4] resize-none overflow-y-auto leading-snug max-h-36 transition"
+              placeholder="${replyTarget ? 'Ваш ответ...' : 'Комментарий...'}"
+              class="comment-autogrow flex-1 min-w-0 w-full min-h-[40px] px-3.5 py-2 rounded-2xl bg-white/[0.09] border border-white/15 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#66c0f4] resize-none overflow-y-auto leading-normal max-h-36 transition"
             ></textarea>
             <button type="submit" aria-label="Отправить" class="btn-acid px-3.5 sm:px-4 h-9 rounded-full text-xs cursor-pointer shrink-0 mb-0.5 flex items-center justify-center"><span class="hidden sm:inline">Отправить</span><span class="sm:hidden text-sm leading-none">➤</span></button>
           </form>
@@ -1178,7 +1179,40 @@
         : '<div class="text-xs text-slate-400 py-6 text-center">Пока нет пользователей</div>';
     }
 
+    function saveCurrentRoute() {
+      let hash = '#home';
+      if (activeView === 'feed') hash = '#feed';
+      else if (activeView === 'profile') {
+        hash = (profileUserId && currentUser && profileUserId !== currentUser.steam_id)
+          ? `#profile/${encodeURIComponent(profileUserId)}`
+          : '#profile';
+      }
+      try {
+        if (window.location.hash !== hash) history.replaceState(null, '', hash);
+        localStorage.setItem('atoq_last_route', hash);
+      } catch {}
+    }
+
+    function restoreSavedRoute() {
+      let hash = window.location.hash || '';
+      if (!hash) {
+        try { hash = localStorage.getItem('atoq_last_route') || ''; } catch {}
+      }
+      if (hash === '#feed') {
+        activeView = 'feed';
+      } else if (hash === '#profile') {
+        activeView = 'profile';
+        profileUserId = currentUser.steam_id;
+      } else if (hash.startsWith('#profile/')) {
+        activeView = 'profile';
+        profileUserId = decodeURIComponent(hash.slice('#profile/'.length)) || currentUser.steam_id;
+      } else {
+        activeView = 'home';
+      }
+    }
+
     function renderApp(animateCards = false) {
+      saveCurrentRoute();
       const isHome = activeView === 'home';
       const isFeed = activeView === 'feed';
       const isProfile = activeView === 'profile';
