@@ -10,6 +10,15 @@ const SESSION_SECRET = (process.env.SESSION_SECRET || 'atoqcritics-dev-secret-ch
 const DATABASE_URL = (process.env.DATABASE_URL || '').trim().replace(/^["']|["']$/g, '');
 const OPENCRITIC_API_KEY = (process.env.OPENCRITIC_API_KEY || process.env.RAPIDAPI_KEY || '').trim().replace(/^["']|["']$/g, '');
 const RAWG_API_KEY = (process.env.RAWG_API_KEY || '').trim().replace(/^["']|["']$/g, '');
+const ADMIN_STEAM_IDS = new Set(
+  (process.env.ADMIN_STEAM_IDS || '76561198211793707')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+);
+function isAdminUser(user) {
+  return Boolean(user && ADMIN_STEAM_IDS.has(String(user.steam_id)));
+}
 
 function getBaseUrl(req) {
   const host = (req.headers['x-forwarded-host'] || req.get('host') || '').split(',')[0].trim();
@@ -349,6 +358,7 @@ async function initDb() {
     ALTER TABLE game_tags ADD COLUMN IF NOT EXISTS genres_json TEXT;
     ALTER TABLE game_tags ADD COLUMN IF NOT EXISTS user_tags_json TEXT;
     ALTER TABLE user_game_lists ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE custom_game_meta ADD COLUMN IF NOT EXISTS labels_json TEXT;
   `);
   console.log('Облачная база PostgreSQL подключена и таблицы готовы.');
   // Backfill achievements for existing reviews in background
@@ -825,7 +835,7 @@ app.get('/api/me', async (req, res) => {
       console.warn('Auto-heal profile failed:', e.message);
     }
   }
-  res.json({ user: req.user || null });
+  res.json({ user: req.user ? { ...req.user, isAdmin: isAdminUser(req.user) } : null });
 });
 
 app.get('/api/users', requireAuth, async (req, res) => {
@@ -1102,6 +1112,7 @@ async function hydrateReviews() {
     try {
       customMetaMap[cm.game_key] = {
         genres: JSON.parse(cm.genres_json || '[]'),
+        labels: JSON.parse(cm.labels_json || '[]'),
         tags: JSON.parse(cm.tags_json || '[]')
       };
     } catch {}
@@ -1166,8 +1177,10 @@ async function hydrateReviews() {
     gameTitle: r.game_title,
     gameImg: r.game_img,
     gameGenres: mergeUnique(baseGenres, cMeta.genres),
-    gameTags: mergeUnique(baseTags, cMeta.tags),
+    gameLabels: mergeUnique(baseTags, cMeta.labels),
+    gameTags: mergeUnique([], cMeta.tags),
     customGenres: cMeta.genres,
+    customLabels: cMeta.labels || [],
     customTags: cMeta.tags,
     externalRatings: extRatingsMap[gKey] || null,
     scores: {
@@ -1582,7 +1595,7 @@ app.delete('/api/notifications', requireAuth, async (req, res) => {
 
 app.post('/api/games/meta', requireAuth, async (req, res) => {
   try {
-    const { appId, gameTitle, genres, tags, mcScore, ocScore, updateRatings } = req.body || {};
+    const { appId, gameTitle, genres, labels, tags, mcScore, ocScore, updateRatings } = req.body || {};
     const numAppId = Number(appId) || 0;
     const cleanTitle = String(gameTitle || '').trim();
     if (numAppId <= 0 && !cleanTitle) {
@@ -1602,17 +1615,19 @@ app.post('/api/games/meta', requireAuth, async (req, res) => {
       return out;
     };
     const finalGenres = cleanList(genres, 8);
+    const finalLabels = cleanList(labels, 15);
     const finalTags = cleanList(tags, 15);
     await pool.query(`
-      INSERT INTO custom_game_meta (game_key, genres_json, tags_json, updated_at)
-      VALUES ($1, $2, $3, $4)
+      INSERT INTO custom_game_meta (game_key, genres_json, labels_json, tags_json, updated_at)
+      VALUES ($1, $2, $3, $4, $5)
       ON CONFLICT (game_key) DO UPDATE SET
         genres_json = EXCLUDED.genres_json,
+        labels_json = EXCLUDED.labels_json,
         tags_json = EXCLUDED.tags_json,
         updated_at = EXCLUDED.updated_at
-    `, [gKey, JSON.stringify(finalGenres), JSON.stringify(finalTags), Date.now()]);
+    `, [gKey, JSON.stringify(finalGenres), JSON.stringify(finalLabels), JSON.stringify(finalTags), Date.now()]);
 
-    if (updateRatings) {
+    if (updateRatings && isAdminUser(req.user)) {
       const parseOptScore = v => {
         if (v === '' || v === null || v === undefined) return null;
         const n = Math.round(Number(v));
@@ -1638,6 +1653,7 @@ app.post('/api/games/meta', requireAuth, async (req, res) => {
 });
 
 app.post('/api/games/ratings/refresh', requireAuth, async (req, res) => {
+  if (!isAdminUser(req.user)) return res.status(403).json({ error: 'Доступно только администратору' });
   try {
     const { appId, gameTitle } = req.body || {};
     const numAppId = Number(appId) || 0;
