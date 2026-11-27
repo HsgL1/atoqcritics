@@ -204,12 +204,18 @@
       }
       input, textarea, select { font-size: 16px !important; }
       .liquid-card:hover { transform: none; }
-      .liquid-glass, .liquid-card {
+      .liquid-glass {
         backdrop-filter: blur(14px) saturate(140%);
         -webkit-backdrop-filter: blur(14px) saturate(140%);
-        isolation: isolate;
-        transform: translate3d(0, 0, 0);
-        background: linear-gradient(155deg, rgba(25, 34, 50, 0.78) 0%, rgba(15, 21, 32, 0.72) 100%);
+        background: linear-gradient(155deg, rgba(25, 34, 50, 0.82) 0%, rgba(15, 21, 32, 0.78) 100%);
+      }
+      /* iOS Safari GPU memory fix: disable expensive backdrop-filter & forced GPU layers on repeating list cards */
+      main .liquid-glass, .liquid-card {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        isolation: auto !important;
+        transform: none !important;
+        background: linear-gradient(155deg, rgba(23, 31, 47, 0.90) 0%, rgba(13, 18, 29, 0.88) 100%);
       }
     }
     @media (pointer: coarse) {
@@ -861,7 +867,7 @@
     let lastDisplayedGames = [];
     let modalScores = { gameplay: 16, visuals: 16, narrative: 16, audio: 16, emotions: 16 };
     let modalNoNarrative = false;
-    let openComments = {}, replyingTo = {}, lastAddedCommentId = null, openEmojiPickerId = null, lastAnimatedReaction = null, searchTimer = null;
+    let openComments = {}, replyingTo = {}, lastAddedCommentId = null, openEmojiPickerId = null, lastAnimatedReaction = null, searchTimer = null, feedVisibleCount = 20;
 
     const esc = s => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
     function formatCommentTime(ts) {
@@ -1027,7 +1033,11 @@
       const el = document.getElementById('boot-loader');
       if (!el || el.classList.contains('hidden')) return;
       el.classList.add('boot-loader-out');
-      setTimeout(() => el.classList.add('hidden'), 370);
+      setTimeout(() => {
+        el.classList.add('hidden');
+        const ring = el.querySelector('.boot-ring-smooth');
+        if (ring) ring.style.animation = 'none';
+      }, 370);
     }
 
     async function boot() {
@@ -1516,11 +1526,11 @@
           <div class="flex flex-col sm:flex-row gap-4">
             ${rev.appId > 0 ? `
               <a href="https://store.steampowered.com/app/${rev.appId}/" target="_blank" rel="noopener" class="sm:w-56 aspect-[460/215] rounded-2xl overflow-hidden border border-white/15 shrink-0 block group bg-[#121a27]">
-                <img src="${esc(rev.gameImg || `/api/steam/cover/${rev.appId}`)}" data-appid="${rev.appId}" onerror="handleCoverError(this)" alt="${esc(rev.gameTitle)}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
+                <img src="${esc(rev.gameImg || `/api/steam/cover/${rev.appId}`)}" data-appid="${rev.appId}" loading="lazy" decoding="async" onerror="handleCoverError(this)" alt="${esc(rev.gameTitle)}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
               </a>
             ` : `
               <div class="sm:w-56 aspect-[460/215] rounded-2xl overflow-hidden border border-white/15 shrink-0 bg-[#121a27]">
-                <img src="${esc(rev.gameImg || makeFallbackCover(rev.gameTitle))}" data-appid="0" onerror="handleCoverError(this)" alt="${esc(rev.gameTitle)}" class="w-full h-full object-cover" />
+                <img src="${esc(rev.gameImg || makeFallbackCover(rev.gameTitle))}" data-appid="0" loading="lazy" decoding="async" onerror="handleCoverError(this)" alt="${esc(rev.gameTitle)}" class="w-full h-full object-cover" />
               </div>
             `}
             <div class="flex-1 min-w-0 space-y-3">
@@ -2193,7 +2203,11 @@
         if (sort === 'highest') list.sort((a,b) => b.total - a.total);
         else if (sort === 'lowest') list.sort((a,b) => a.total - b.total);
         else if (sort === 'popular') list.sort((a,b) => (b.likes.length - b.dislikes.length) - (a.likes.length - a.dislikes.length));
-        document.getElementById('feed-list').innerHTML = list.length ? list.map((r, i) => renderCard(r, i, animateCards)).join('') : '<div class="liquid-glass anim-card rounded-[26px] p-10 text-center text-sm text-slate-300">Лента пока пуста. Нажмите «+ Новый обзор», чтобы оценить первую игру!</div>';
+        const visibleFeed = list.slice(0, feedVisibleCount);
+        const remFeed = list.length - visibleFeed.length;
+        document.getElementById('feed-list').innerHTML = list.length
+          ? visibleFeed.map((r, i) => renderCard(r, i, animateCards)).join('') + (remFeed > 0 ? `<div class="pt-2 flex justify-center"><button type="button" data-load-more-feed="1" class="liquid-pill px-6 py-2.5 rounded-full text-xs sm:text-sm font-semibold text-slate-200 hover:text-[#d9ff00] cursor-pointer">Показать ещё (осталось ${remFeed})</button></div>` : '')
+          : '<div class="liquid-glass anim-card rounded-[26px] p-10 text-center text-sm text-slate-300">Лента пока пуста. Нажмите «+ Новый обзор», чтобы оценить первую игру!</div>';
       } else {
         const u = users.find(x => x.steam_id === profileUserId) || currentUser;
         const uRevs = reviews.filter(r => r.userId === u.steam_id);
@@ -2853,10 +2867,20 @@
       if (sort === 'highest') list.sort((a,b) => b.total - a.total);
       else if (sort === 'lowest') list.sort((a,b) => a.total - b.total);
       else if (sort === 'popular') list.sort((a,b) => (b.likes.length - b.dislikes.length) - (a.likes.length - a.dislikes.length));
-      document.getElementById('feed-list').innerHTML = list.length ? list.map((r, i) => renderCard(r, i, false)).join('') : '<div class="liquid-glass rounded-[26px] p-10 text-center text-sm text-slate-300">Ничего не найдено.</div>';
+      const visibleFeed = list.slice(0, feedVisibleCount);
+      const remFeed = list.length - visibleFeed.length;
+      document.getElementById('feed-list').innerHTML = list.length
+        ? visibleFeed.map((r, i) => renderCard(r, i, false)).join('') + (remFeed > 0 ? `<div class="pt-2 flex justify-center"><button type="button" data-load-more-feed="1" class="liquid-pill px-6 py-2.5 rounded-full text-xs sm:text-sm font-semibold text-slate-200 hover:text-[#d9ff00] cursor-pointer">Показать ещё (осталось ${remFeed})</button></div>` : '')
+        : '<div class="liquid-glass rounded-[26px] p-10 text-center text-sm text-slate-300">Ничего не найдено.</div>';
     }
-    document.getElementById('feed-search').oninput = () => { clearTimeout(feedSearchTimer); feedSearchTimer = setTimeout(renderFeedListOnly, 120); };
-    document.getElementById('feed-sort').onchange = renderFeedListOnly;
+    document.getElementById('feed-search').oninput = () => { feedVisibleCount = 20; clearTimeout(feedSearchTimer); feedSearchTimer = setTimeout(renderFeedListOnly, 120); };
+    document.getElementById('feed-sort').onchange = () => { feedVisibleCount = 20; renderFeedListOnly(); };
+    document.getElementById('feed-list').addEventListener('click', e => {
+      if (e.target.closest('[data-load-more-feed]')) {
+        feedVisibleCount += 20;
+        renderFeedListOnly();
+      }
+    });
     let profileSearchTimer = null;
     function renderProfileSubTabs(u, uRevs, animateCards = false) {
       const isOwnProf = u.steam_id === currentUser.steam_id;
@@ -2926,6 +2950,8 @@
                 draggable="false"
                 data-appid="${item.appId}"
                 data-header-img="${esc(item.gameImg || '')}"
+                loading="lazy"
+                decoding="async"
                 onload="handlePosterLoad(this)"
                 onerror="handlePosterError(this)"
                 alt="${esc(item.gameTitle)}"
