@@ -320,6 +320,14 @@
     .anim-critic-badge {
       animation: criticBadgePop 0.36s cubic-bezier(0.22, 1, 0.36, 1) both;
     }
+
+    @keyframes gameItemInDimmed {
+      0% { opacity: 0; transform: translateY(8px) scale(0.985); }
+      100% { opacity: 0.52; transform: translateY(0) scale(1); }
+    }
+    .anim-game-item.opacity-55 {
+      animation-name: gameItemInDimmed !important;
+    }
   </style>
 </head>
 <body>
