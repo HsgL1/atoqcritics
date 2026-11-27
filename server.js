@@ -569,6 +569,43 @@ function isTargetMcPlatform(entry) {
     || text.includes('xbox');
 }
 
+async function fetchMetacriticPlatformReviewCount(mcUrl) {
+  if (!mcUrl) return null;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4000);
+  try {
+    const res = await fetch(mcUrl, {
+      signal: controller.signal,
+      redirect: 'follow',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml'
+      }
+    });
+    clearTimeout(timer);
+    if (!res.ok) return null;
+    const html = await res.text();
+    const ldMatches = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) || [];
+    for (const block of ldMatches) {
+      const inner = block.replace(/^<script[^>]*>/i, '').replace(/<\/script>$/i, '').trim();
+      try {
+        const obj = JSON.parse(inner);
+        const ar = obj && obj.aggregateRating;
+        const cnt = Number(ar && (ar.reviewCount || ar.ratingCount));
+        if (Number.isFinite(cnt) && cnt > 0 && cnt < 10000) return Math.round(cnt);
+      } catch {}
+    }
+    const m = html.match(/"reviewCount"\s*:\s*(\d{1,4})/) || html.match(/Based on\s+(\d{1,4})\s+Critic Reviews/i);
+    if (m) {
+      const cnt = Number(m[1]);
+      if (Number.isFinite(cnt) && cnt > 0) return cnt;
+    }
+  } catch {
+    clearTimeout(timer);
+  }
+  return null;
+}
+
 async function fetchMetacriticFromRawg(gameTitle) {
   if (!RAWG_API_KEY) return null;
   const cleanQuery = cleanGameQueryTitle(gameTitle);
@@ -589,14 +626,34 @@ async function fetchMetacriticFromRawg(gameTitle) {
   );
 
   const mcPlatforms = Array.isArray(detail && detail.metacritic_platforms) ? detail.metacritic_platforms : [];
-  const filteredScores = mcPlatforms
+  const targetPlatforms = mcPlatforms
     .filter(isTargetMcPlatform)
-    .map(x => Number(x.metascore))
-    .filter(n => Number.isFinite(n) && n > 0 && n <= 100);
+    .map(x => ({ score: Number(x.metascore), url: x.url || '' }))
+    .filter(x => Number.isFinite(x.score) && x.score > 0 && x.score <= 100);
 
   let finalScore = null;
-  if (filteredScores.length > 0) {
-    finalScore = Math.round(filteredScores.reduce((a, b) => a + b, 0) / filteredScores.length);
+  if (targetPlatforms.length === 1) {
+    finalScore = Math.round(targetPlatforms[0].score);
+  } else if (targetPlatforms.length > 1) {
+    // Weighted average by critic review count on each platform (PC + PlayStation + Xbox)
+    const enriched = await Promise.all(targetPlatforms.slice(0, 5).map(async tp => {
+      const cnt = tp.url ? await fetchMetacriticPlatformReviewCount(tp.url) : null;
+      return { score: tp.score, count: cnt };
+    }));
+    const withCounts = enriched.filter(x => Number.isFinite(x.count) && x.count > 0);
+    if (withCounts.length >= 2) {
+      const totalWeight = withCounts.reduce((acc, x) => acc + x.count, 0);
+      const weightedSum = withCounts.reduce((acc, x) => acc + (x.score * x.count), 0);
+      finalScore = Math.round(weightedSum / totalWeight);
+    } else if (withCounts.length === 1) {
+      // One platform has verified count; give unverified secondary platforms a modest fallback weight
+      const fallbackW = Math.max(4, Math.min(15, Math.round(withCounts[0].count * 0.2)));
+      const totalWeight = enriched.reduce((acc, x) => acc + (x.count || fallbackW), 0);
+      const weightedSum = enriched.reduce((acc, x) => acc + (x.score * (x.count || fallbackW)), 0);
+      finalScore = Math.round(weightedSum / totalWeight);
+    } else {
+      finalScore = Math.round(targetPlatforms.reduce((a, b) => a + b.score, 0) / targetPlatforms.length);
+    }
   } else {
     const fallbackAll = mcPlatforms
       .map(x => Number(x.metascore))
@@ -742,7 +799,7 @@ async function fetchOpenCriticByTitle(gameTitle) {
   return null;
 }
 
-const MC_LOGIC_VERSION = 4;
+const MC_LOGIC_VERSION = 5;
 
 async function ensureExternalRatings(appId, gameTitle, force = false, opts = {}) {
   const numAppId = Number(appId) || 0;
@@ -1802,12 +1859,12 @@ app.post('/api/games/meta', requireAuth, async (req, res) => {
       const cleanOc = parseOptScore(ocScore);
       await pool.query(`
         INSERT INTO game_external_ratings (game_key, app_id, game_title, mc_score, oc_score, manual_override, mc_version, updated_at)
-        VALUES ($1, $2, $3, $4, $5, TRUE, 4, $6)
+        VALUES ($1, $2, $3, $4, $5, TRUE, 5, $6)
         ON CONFLICT (game_key) DO UPDATE SET
           mc_score = EXCLUDED.mc_score,
           oc_score = EXCLUDED.oc_score,
           manual_override = TRUE,
-          mc_version = 4,
+          mc_version = 5,
           updated_at = EXCLUDED.updated_at
       `, [gKey, numAppId, cleanTitle || gKey, cleanMc, cleanOc, Date.now()]);
     }
