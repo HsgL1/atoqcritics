@@ -415,13 +415,40 @@
             </select>
           </div>
 
-          <!-- Category Filter Pills (Все / Шедевр / Отлично / Неплохо / Слабо) -->
-          <div id="games-cat-pills" class="flex flex-wrap items-center gap-1.5"></div>
+          <!-- Category Filter Pills + Laconic Filters Toggle -->
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div id="games-cat-pills" class="flex flex-wrap items-center gap-1.5"></div>
+            <button id="btn-toggle-games-filters" type="button" class="liquid-pill px-3.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 cursor-pointer shrink-0">
+              <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5 text-[#66c0f4]"></i>
+              <span>Жанры и метки</span>
+              <span id="games-active-filter-badge" class="hidden px-1.5 py-0.2 rounded-full bg-[#d9ff00] text-[#090c12] text-[10px] font-black">0</span>
+            </button>
+          </div>
 
-          <!-- Steam Tags Filter Strip -->
-          <div class="space-y-1.5">
-            <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Теги Steam</div>
-            <div id="games-tags-strip" class="flex flex-wrap items-center gap-1.5"></div>
+          <!-- Active Selected Genres / Tags Chips (compact, removable in 1 click) -->
+          <div id="games-active-chips" class="hidden flex-wrap items-center gap-1.5 pt-0.5"></div>
+
+          <!-- Collapsible Genres & Steam User Tags Multi-Select Drawer -->
+          <div id="games-filters-drawer" class="hidden anim-drawer rounded-2xl bg-black/25 border border-white/10 p-3.5 sm:p-4 space-y-4">
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-[#66c0f4]">Жанры Steam</span>
+                <span class="text-[11px] text-slate-400">Можно выбрать несколько</span>
+              </div>
+              <div id="games-genres-strip" class="flex flex-wrap items-center gap-1.5"></div>
+            </div>
+
+            <div class="border-t border-white/[0.08] pt-3 space-y-2">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-[#d9ff00]">Метки Steam</span>
+                <div class="relative w-full sm:w-56">
+                  <input id="games-tag-search" type="text" placeholder="Найти метку..." class="w-full pl-3 pr-8 py-1.5 rounded-full bg-white/[0.07] border border-white/12 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-[#d9ff00] transition" />
+                  <button id="clear-games-tag-search" type="button" class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-slate-400 hover:text-white cursor-pointer">✕</button>
+                </div>
+              </div>
+              <div id="games-tags-strip" class="flex flex-wrap items-center gap-1.5"></div>
+              <button id="btn-toggle-all-tags" type="button" class="hidden text-[11px] font-semibold text-[#7ccaf8] hover:text-[#d9ff00] cursor-pointer"></button>
+            </div>
           </div>
         </div>
 
@@ -518,6 +545,16 @@
               </div>
             </div>
 
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div class="space-y-1">
+                <label for="custom-game-genres" class="text-[11px] font-semibold text-slate-300">Жанры (через запятую, опц.)</label>
+                <input id="custom-game-genres" type="text" placeholder="Экшены, Ролевые игры" class="w-full px-3.5 py-2.5 rounded-2xl bg-white/[0.07] border border-white/15 text-xs sm:text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#66c0f4] transition" />
+              </div>
+              <div class="space-y-1">
+                <label for="custom-game-tags" class="text-[11px] font-semibold text-slate-300">Метки (через запятую, опц.)</label>
+                <input id="custom-game-tags" type="text" placeholder="Похожа на Dark Souls, Хардкор" class="w-full px-3.5 py-2.5 rounded-2xl bg-white/[0.07] border border-white/15 text-xs sm:text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#d9ff00] transition" />
+              </div>
+            </div>
             <button id="btn-start-custom-review" type="button" class="btn-acid w-full py-3 rounded-2xl text-sm cursor-pointer">Перейти к оценке →</button>
           </div>
         </div>
@@ -558,6 +595,48 @@
     </div>
   </div>
 
+  <!-- MODAL: EDIT / ADD GENRES & TAGS FOR ANY GAME -->
+  <div id="meta-modal" class="hidden fixed inset-0 z-40 flex items-end sm:items-center justify-center p-0 sm:p-5 bg-black/75 backdrop-blur-md anim-modal-bg">
+    <div class="liquid-glass-strong anim-modal-panel w-full max-w-xl max-h-[90dvh] rounded-t-[28px] sm:rounded-[30px] flex flex-col overflow-hidden pb-[env(safe-area-inset-bottom)]">
+      <div class="px-5 py-4 border-b border-white/10 flex items-center justify-between gap-3">
+        <div class="min-w-0">
+          <h2 class="text-base sm:text-lg font-bold text-white truncate">Жанры и метки игры</h2>
+          <p id="meta-modal-subtitle" class="text-xs text-slate-400 truncate"></p>
+        </div>
+        <button id="btn-close-meta-modal" type="button" class="liquid-pill p-2 rounded-full cursor-pointer shrink-0"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+
+      <div class="p-4 sm:p-5 overflow-y-auto overscroll-contain flex-1 space-y-5">
+        <!-- Genres Editor -->
+        <div class="space-y-2.5">
+          <div class="text-xs font-bold uppercase tracking-wider text-[#66c0f4]">Жанры</div>
+          <div id="meta-current-genres" class="flex flex-wrap gap-1.5"></div>
+          <div class="flex gap-2">
+            <input id="meta-add-genre-input" type="text" maxlength="40" placeholder="Добавить свой жанр..." class="flex-1 min-w-0 px-3.5 py-2 rounded-full bg-white/[0.07] border border-white/15 text-xs sm:text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#66c0f4]" />
+            <button id="btn-meta-add-genre" type="button" class="liquid-pill px-4 py-2 rounded-full text-xs font-bold text-[#66c0f4] cursor-pointer shrink-0">+ Добавить</button>
+          </div>
+          <div id="meta-quick-genres" class="flex flex-wrap gap-1.5 pt-0.5"></div>
+        </div>
+
+        <!-- User Tags / Метки Editor -->
+        <div class="border-t border-white/10 pt-4 space-y-2.5">
+          <div class="text-xs font-bold uppercase tracking-wider text-[#d9ff00]">Метки и теги</div>
+          <div id="meta-current-tags" class="flex flex-wrap gap-1.5"></div>
+          <div class="flex gap-2">
+            <input id="meta-add-tag-input" type="text" maxlength="40" placeholder="Например: Похожа на Dark Souls..." class="flex-1 min-w-0 px-3.5 py-2 rounded-full bg-white/[0.07] border border-white/15 text-xs sm:text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#d9ff00]" />
+            <button id="btn-meta-add-tag" type="button" class="liquid-pill px-4 py-2 rounded-full text-xs font-bold text-[#d9ff00] cursor-pointer shrink-0">+ Добавить</button>
+          </div>
+          <div id="meta-quick-tags" class="flex flex-wrap gap-1.5 pt-0.5"></div>
+        </div>
+      </div>
+
+      <div class="px-5 py-3.5 border-t border-white/10 flex justify-end gap-2">
+        <button id="btn-cancel-meta-modal" type="button" class="liquid-pill px-4 py-2 rounded-full text-xs sm:text-sm cursor-pointer">Отмена</button>
+        <button id="btn-save-meta-modal" type="button" class="btn-acid px-5 py-2 rounded-full text-xs sm:text-sm cursor-pointer">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const CRITERIA = [
       { key: 'gameplay', label: 'Геймплей', color: '#d9ff00' },
@@ -570,7 +649,7 @@
 
     let currentUser = null, users = [], reviews = [], myLibrary = [], libraryPrivate = false, libraryError = '';
     let notifications = [], notifFilter = 'all', notifOpen = false;
-    let gamesCatFilter = 'all', gamesTagFilter = 'all';
+    let gamesCatFilter = 'all', gamesSelectedGenres = new Set(), gamesSelectedTags = new Set(), gamesFiltersOpen = false, gamesShowAllTags = false;
     let activeView = 'home', profileUserId = null, searchTab = 'all', selectedGame = null, editingReviewId = null;
     let lastDisplayedGames = [];
     let modalScores = { gameplay: 16, visuals: 16, narrative: 16, audio: 16, emotions: 16 };
@@ -1390,7 +1469,10 @@
             appId: r.appId,
             title: r.gameTitle,
             img: r.gameImg,
+            genres: new Set(),
             tags: new Set(),
+            customGenres: new Set(),
+            customTags: new Set(),
             reviews: [],
             latestAt: 0
           });
@@ -1399,7 +1481,10 @@
         g.reviews.push(r);
         if (!g.img && r.gameImg) g.img = r.gameImg;
         if (r.createdAt > g.latestAt) g.latestAt = r.createdAt;
-        (r.gameTags || []).forEach(t => g.tags.add(t));
+        (r.gameGenres || []).forEach(x => g.genres.add(x));
+        (r.gameTags || []).forEach(x => g.tags.add(x));
+        (r.customGenres || []).forEach(x => g.customGenres.add(x));
+        (r.customTags || []).forEach(x => g.customTags.add(x));
       });
       return Array.from(map.values()).map(g => {
         const count = g.reviews.length;
@@ -1407,7 +1492,10 @@
         const cat = avg >= 90 ? 'master' : avg >= 75 ? 'great' : avg >= 55 ? 'ok' : 'weak';
         return {
           ...g,
+          genres: Array.from(g.genres),
           tags: Array.from(g.tags),
+          customGenres: Array.from(g.customGenres),
+          customTags: Array.from(g.customTags),
           count,
           avg,
           cat
@@ -1437,32 +1525,98 @@
         </button>
       `).join('');
 
-      // Collect all Steam tags sorted by frequency
-      const tagCounts = new Map();
-      allGames.forEach(g => g.tags.forEach(t => tagCounts.set(t, (tagCounts.get(t) || 0) + 1)));
-      const sortedTags = Array.from(tagCounts.entries()).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+      // Active filters badge & removable chips
+      const activeCount = gamesSelectedGenres.size + gamesSelectedTags.size;
+      const filterBadge = document.getElementById('games-active-filter-badge');
+      const filterBtn = document.getElementById('btn-toggle-games-filters');
+      filterBadge.textContent = String(activeCount);
+      filterBadge.classList.toggle('hidden', activeCount === 0);
+      filterBtn.classList.toggle('liquid-pill-active', gamesFiltersOpen || activeCount > 0);
+      document.getElementById('games-filters-drawer').classList.toggle('hidden', !gamesFiltersOpen);
 
-      const tagsStrip = document.getElementById('games-tags-strip');
-      if (!sortedTags.length) {
-        tagsStrip.innerHTML = '<span class="text-xs text-slate-400">Теги Steam загружаются...</span>';
-      } else {
-        tagsStrip.innerHTML = [
-          `<button type="button" data-games-tag="all" class="liquid-pill ${gamesTagFilter === 'all' ? 'liquid-pill-active' : ''} px-3 py-1 rounded-full text-xs font-medium cursor-pointer">Все теги</button>`,
-          ...sortedTags.map(([tag, cnt]) => `
-            <button type="button" data-games-tag="${esc(tag)}" class="liquid-pill ${gamesTagFilter === tag ? 'liquid-pill-active' : ''} px-3 py-1 rounded-full text-xs font-medium cursor-pointer">
-              ${esc(tag)} <span class="text-[10px] text-slate-400 ml-0.5">${cnt}</span>
-            </button>
-          `)
+      const chipsEl = document.getElementById('games-active-chips');
+      if (activeCount > 0) {
+        chipsEl.classList.remove('hidden');
+        chipsEl.classList.add('flex');
+        const genreChips = Array.from(gamesSelectedGenres).map(gn => `
+          <button type="button" data-games-genre="${esc(gn)}" class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[#66c0f4]/18 border border-[#66c0f4]/45 text-[#9bd6f9] hover:bg-[#66c0f4]/28 flex items-center gap-1 cursor-pointer">
+            <span>${esc(gn)}</span><span class="text-[10px]">✕</span>
+          </button>
+        `);
+        const tagChips = Array.from(gamesSelectedTags).map(tg => `
+          <button type="button" data-games-tag="${esc(tg)}" class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[#d9ff00]/16 border border-[#d9ff00]/45 text-[#eaff66] hover:bg-[#d9ff00]/26 flex items-center gap-1 cursor-pointer">
+            <span>#${esc(tg)}</span><span class="text-[10px]">✕</span>
+          </button>
+        `);
+        chipsEl.innerHTML = [
+          ...genreChips,
+          ...tagChips,
+          '<button type="button" id="btn-reset-games-filters" class="px-2.5 py-1 rounded-full text-[11px] text-slate-400 hover:text-rose-300 cursor-pointer">Сбросить</button>'
         ].join('');
+        const resetBtn = document.getElementById('btn-reset-games-filters');
+        if (resetBtn) {
+          resetBtn.onclick = () => {
+            gamesSelectedGenres.clear();
+            gamesSelectedTags.clear();
+            renderGamesCatalog(false);
+          };
+        }
+      } else {
+        chipsEl.classList.add('hidden');
+        chipsEl.classList.remove('flex');
+        chipsEl.innerHTML = '';
       }
 
-      // Filter & Sort
+      // Collect Steam Genres sorted by frequency
+      const genreCounts = new Map();
+      allGames.forEach(g => g.genres.forEach(gn => genreCounts.set(gn, (genreCounts.get(gn) || 0) + 1)));
+      const sortedGenres = Array.from(genreCounts.entries()).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+
+      const genresStrip = document.getElementById('games-genres-strip');
+      genresStrip.innerHTML = sortedGenres.length
+        ? sortedGenres.map(([gn, cnt]) => {
+            const active = gamesSelectedGenres.has(gn);
+            return `<button type="button" data-games-genre="${esc(gn)}" class="liquid-pill ${active ? 'border-[#66c0f4]/70 bg-[#66c0f4]/22 text-white' : 'text-slate-300'} px-3 py-1 rounded-full text-xs font-medium cursor-pointer">${esc(gn)} <span class="text-[10px] text-slate-400 ml-0.5">${cnt}</span></button>`;
+          }).join('')
+        : '<span class="text-xs text-slate-400">Жанры Steam загружаются...</span>';
+
+      // Collect Steam User Tags ("Метки") sorted by frequency + filter by mini tag search
+      const tagCounts = new Map();
+      allGames.forEach(g => g.tags.forEach(t => tagCounts.set(t, (tagCounts.get(t) || 0) + 1)));
+      const tagQ = (document.getElementById('games-tag-search')?.value || '').trim().toLowerCase();
+      let sortedTags = Array.from(tagCounts.entries()).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+      if (tagQ) sortedTags = sortedTags.filter(([t]) => t.toLowerCase().includes(tagQ));
+
+      const maxInitialTags = 16;
+      const visibleTags = (gamesShowAllTags || tagQ) ? sortedTags : sortedTags.slice(0, maxInitialTags);
+      const tagsStrip = document.getElementById('games-tags-strip');
+      tagsStrip.innerHTML = visibleTags.length
+        ? visibleTags.map(([tg, cnt]) => {
+            const active = gamesSelectedTags.has(tg);
+            return `<button type="button" data-games-tag="${esc(tg)}" class="liquid-pill ${active ? 'border-[#d9ff00]/70 bg-[#d9ff00]/18 text-[#eaff66]' : 'text-slate-300'} px-3 py-1 rounded-full text-xs font-medium cursor-pointer">${esc(tg)} <span class="text-[10px] text-slate-400 ml-0.5">${cnt}</span></button>`;
+          }).join('')
+        : `<span class="text-xs text-slate-400">${tagQ ? 'Метки не найдены' : 'Метки Steam загружаются в фоне (обновите страницу через ~20 сек)...'}</span>`;
+
+      const toggleAllTagsBtn = document.getElementById('btn-toggle-all-tags');
+      if (!tagQ && sortedTags.length > maxInitialTags) {
+        toggleAllTagsBtn.classList.remove('hidden');
+        toggleAllTagsBtn.textContent = gamesShowAllTags ? 'Свернуть метки ↑' : `Показать все метки (${sortedTags.length}) ↓`;
+      } else {
+        toggleAllTagsBtn.classList.add('hidden');
+      }
+
+      // Filter & Sort Games (Multi-select AND across genres & tags)
       const q = (document.getElementById('games-search')?.value || '').trim().toLowerCase();
       const sort = document.getElementById('games-sort')?.value || 'highest';
       let list = allGames.filter(g => {
         if (gamesCatFilter !== 'all' && g.cat !== gamesCatFilter) return false;
-        if (gamesTagFilter !== 'all' && !g.tags.includes(gamesTagFilter)) return false;
-        if (q && !g.title.toLowerCase().includes(q) && !g.tags.some(t => t.toLowerCase().includes(q))) return false;
+        for (const gn of gamesSelectedGenres) {
+          if (!g.genres.includes(gn)) return false;
+        }
+        for (const tg of gamesSelectedTags) {
+          if (!g.tags.includes(tg)) return false;
+        }
+        if (q && !g.title.toLowerCase().includes(q) && !g.genres.some(x => x.toLowerCase().includes(q)) && !g.tags.some(x => x.toLowerCase().includes(q))) return false;
         return true;
       });
 
@@ -1486,23 +1640,33 @@
         const alreadyMine = hasUserReviewedGame(g.appId, g.title);
         const firstRevId = g.reviews[0].id;
         const delay = Math.min(idx * 25, 220);
+        const allNoNarrative = g.reviews.every(r => r.noNarrative);
+        const displayMax = allNoNarrative ? 25 : 20;
 
-        // Average score for each of the 4-5 criteria across critics
+        // Clean average score for each criterion (NO percentages — crisp X/20 or X/25!)
         const critSummary = CRITERIA.map(c => {
           const valid = g.reviews.filter(r => !(r.noNarrative && c.key === 'narrative'));
           if (!valid.length) return '';
-          const avgPct = Math.round(valid.reduce((acc, r) => acc + ((Number(r.scores[c.key] || 0) / (r.noNarrative ? 25 : 20)) * 100), 0) / valid.length);
-          const fill = criterionFill(avgPct, 100);
+          const avgRatio = valid.reduce((acc, r) => acc + (Number(r.scores[c.key] || 0) / (r.noNarrative ? 25 : 20)), 0) / valid.length;
+          const avgScore = Math.round(avgRatio * displayMax);
+          const fillPct = Math.min(100, Math.max(0, Math.round(avgRatio * 100)));
+          const fill = criterionFill(avgScore, displayMax);
           return `
             <div class="relative overflow-hidden rounded-full bg-white/[0.05] border border-white/[0.10] px-2.5 py-1">
-              <div class="absolute inset-y-0 left-0" style="width:${avgPct}%; background:${fill.bg};"></div>
+              <div class="absolute inset-y-0 left-0" style="width:${fillPct}%; background:${fill.bg};"></div>
               <div class="relative z-10 flex items-center justify-between gap-1 text-[11px] font-semibold text-white tabular-nums">
                 <span class="truncate">${c.label}</span>
-                <span>${avgPct}%</span>
+                <span class="shrink-0">${avgScore}/${displayMax}</span>
               </div>
             </div>
           `;
         }).filter(Boolean).join('');
+
+        // Compact, uncluttered pills on card: up to 2 genres (Steam blue) + up to 3 top user tags (subtle glass)
+        const cardPills = [
+          ...g.genres.slice(0, 2).map(gn => `<button type="button" data-games-genre="${esc(gn)}" class="px-2.5 py-0.5 rounded-full text-[11px] bg-[#66c0f4]/12 hover:bg-[#66c0f4]/24 border border-[#66c0f4]/30 text-[#9bd6f9] transition cursor-pointer">${esc(gn)}</button>`),
+          ...g.tags.slice(0, 3).map(tg => `<button type="button" data-games-tag="${esc(tg)}" class="px-2.5 py-0.5 rounded-full text-[11px] bg-white/[0.06] hover:bg-white/[0.14] border border-white/10 text-slate-300 hover:text-white transition cursor-pointer">${esc(tg)}</button>`)
+        ].join('');
 
         return `
           <article class="liquid-card ${animateCards ? 'anim-card' : ''} rounded-[24px] p-4 flex flex-col justify-between gap-3.5" ${animateCards ? `style="animation-delay:${delay}ms;"` : ''}>
@@ -1533,22 +1697,23 @@
                 </div>
               </div>
 
-              ${g.tags.length ? `
-                <div class="flex flex-wrap gap-1.5">
-                  ${g.tags.map(t => `<button type="button" data-games-tag="${esc(t)}" class="px-2.5 py-0.5 rounded-full text-[11px] bg-white/[0.06] hover:bg-white/[0.14] border border-white/10 text-slate-300 hover:text-white transition cursor-pointer">${esc(t)}</button>`).join('')}
-                </div>
-              ` : ''}
+              ${cardPills ? `<div class="flex flex-wrap gap-1.5">${cardPills}</div>` : ''}
 
               <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                 ${critSummary}
               </div>
             </div>
 
-            <div class="flex items-center justify-between gap-2 pt-2.5 border-t border-white/[0.08]">
-              <button type="button" data-home-jump-game="${esc(g.title)}" class="liquid-pill px-3.5 py-1.5 rounded-full text-xs font-semibold text-slate-200 hover:text-white cursor-pointer">
-                Читать обзоры (${g.count})
-              </button>
-              ${!alreadyMine ? `<button type="button" data-rate-same-game="${esc(firstRevId)}" class="liquid-pill px-3.5 py-1.5 rounded-full text-xs font-semibold text-[#d9ff00] hover:border-[#d9ff00]/60 hover:bg-[#d9ff00]/10 cursor-pointer">+ Оценить</button>` : '<span class="text-[11px] font-semibold text-[#d9ff00]/80 px-2">✓ Оценено вами</span>'}
+            <div class="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-white/[0.08]">
+              <div class="flex items-center gap-1.5">
+                <button type="button" data-home-jump-game="${esc(g.title)}" class="liquid-pill px-3 py-1.5 rounded-full text-xs font-semibold text-slate-200 hover:text-white cursor-pointer">
+                  Обзоры (${g.count})
+                </button>
+                <button type="button" data-edit-game-meta="${esc(g.key)}" title="Добавить или изменить жанры и метки" class="liquid-pill px-3 py-1.5 rounded-full text-xs font-semibold text-[#7ccaf8] hover:border-[#66c0f4]/60 cursor-pointer">
+                  + Теги
+                </button>
+              </div>
+              ${!alreadyMine ? `<button type="button" data-rate-same-game="${esc(firstRevId)}" class="liquid-pill px-3.5 py-1.5 rounded-full text-xs font-semibold text-[#d9ff00] hover:border-[#d9ff00]/60 hover:bg-[#d9ff00]/10 cursor-pointer">+ Оценить</button>` : '<span class="text-[11px] font-semibold text-[#d9ff00]/80 px-1">✓ Оценено</span>'}
             </div>
           </article>
         `;
@@ -1826,6 +1991,8 @@
       document.getElementById('input-review-text').value = '';
       document.getElementById('input-hours').value = '';
       document.getElementById('custom-game-title').value = '';
+      if (document.getElementById('custom-game-genres')) document.getElementById('custom-game-genres').value = '';
+      if (document.getElementById('custom-game-tags')) document.getElementById('custom-game-tags').value = '';
       document.getElementById('custom-game-url').value = '';
       document.getElementById('custom-game-file').value = '';
       customCoverDataUrl = '';
@@ -1987,7 +2154,9 @@
         return;
       }
       const cover = customCoverDataUrl || document.getElementById('custom-game-url').value.trim() || makeFallbackCover(title);
-      openRateStep({ appId: 0, title, img: cover });
+      const initGenres = (document.getElementById('custom-game-genres')?.value || '').split(',').map(x => x.trim()).filter(Boolean);
+      const initTags = (document.getElementById('custom-game-tags')?.value || '').split(',').map(x => x.trim()).filter(Boolean);
+      openRateStep({ appId: 0, title, img: cover, initGenres, initTags });
     };
     document.getElementById('steam-game-search').oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => renderSearchResults(false), 200); };
     document.getElementById('steam-search-results').onclick = e => {
@@ -2056,6 +2225,22 @@
         });
         const respData = await r.json().catch(() => ({}));
         if (r.ok) {
+          if (!isEdit && selectedGame && ((selectedGame.initGenres && selectedGame.initGenres.length) || (selectedGame.initTags && selectedGame.initTags.length))) {
+            const mr = await fetch('/api/games/meta', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                appId: selectedGame.appId,
+                gameTitle: selectedGame.title,
+                genres: selectedGame.initGenres || [],
+                tags: selectedGame.initTags || []
+              })
+            }).catch(() => null);
+            if (mr && mr.ok) {
+              const md = await mr.json();
+              if (md && md.reviews) respData.reviews = md.reviews;
+            }
+          }
           reviews = respData.reviews;
           editingReviewId = null;
           closeModal();
@@ -2138,11 +2323,18 @@
     });
 
     document.getElementById('app-shell').onclick = async e => {
+      const emeta = e.target.closest('[data-edit-game-meta]');
+      if (emeta) {
+        const game = buildAggregatedGames().find(x => x.key === emeta.dataset.editGameMeta);
+        if (game) openMetaModal(game);
+        return;
+      }
       const jcat = e.target.closest('[data-jump-games-cat]');
       if (jcat) {
         activeView = 'games';
         gamesCatFilter = jcat.dataset.jumpGamesCat || 'all';
-        gamesTagFilter = 'all';
+        gamesSelectedGenres.clear();
+        gamesSelectedTags.clear();
         renderApp(true);
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
@@ -2154,11 +2346,24 @@
         renderGamesCatalog(false);
         return;
       }
+      const ggen = e.target.closest('[data-games-genre]');
+      if (ggen) {
+        const gn = ggen.dataset.gamesGenre;
+        if (gn) {
+          if (gamesSelectedGenres.has(gn)) gamesSelectedGenres.delete(gn);
+          else gamesSelectedGenres.add(gn);
+          renderGamesCatalog(false);
+        }
+        return;
+      }
       const gtag = e.target.closest('[data-games-tag]');
       if (gtag) {
-        const nextTag = gtag.dataset.gamesTag || 'all';
-        gamesTagFilter = gamesTagFilter === nextTag && nextTag !== 'all' ? 'all' : nextTag;
-        renderGamesCatalog(false);
+        const tg = gtag.dataset.gamesTag;
+        if (tg) {
+          if (gamesSelectedTags.has(tg)) gamesSelectedTags.delete(tg);
+          else gamesSelectedTags.add(tg);
+          renderGamesCatalog(false);
+        }
         return;
       }
       const jg = e.target.closest('[data-home-jump-game]');
@@ -2486,6 +2691,16 @@
     let gamesSearchTimer = null;
     document.getElementById('games-search').oninput = () => { clearTimeout(gamesSearchTimer); gamesSearchTimer = setTimeout(() => renderGamesCatalog(false), 120); };
     document.getElementById('games-sort').onchange = () => renderGamesCatalog(false);
+    document.getElementById('btn-toggle-games-filters').onclick = () => {
+      gamesFiltersOpen = !gamesFiltersOpen;
+      renderGamesCatalog(false);
+    };
+    document.getElementById('btn-toggle-all-tags').onclick = () => {
+      gamesShowAllTags = !gamesShowAllTags;
+      renderGamesCatalog(false);
+    };
+    bindClearSearch('games-tag-search', 'clear-games-tag-search', () => renderGamesCatalog(false));
+    document.getElementById('games-tag-search').oninput = () => renderGamesCatalog(false);
 
     document.getElementById('btn-notifications').onclick = e => {
       e.stopPropagation();
@@ -2558,6 +2773,131 @@
         if (notifOpen) toggleNotifPanel(false);
       }
     });
+
+    const QUICK_GENRES = ['Экшены', 'Ролевые игры', 'Приключенческие игры', 'Инди', 'Стратегии', 'Симуляторы', 'Шутер', 'Хоррор', 'Головоломка', 'Гонки', 'Файтинг', 'Выживание'];
+    const QUICK_TAGS = ['Открытый мир', 'Глубокий сюжет', 'Похожа на Dark Souls', 'Рогалик', 'Кооператив', 'Отличный саундтрек', 'Атмосферная', 'Хардкор', 'Метроидвания', 'Песочница', 'От первого лица', 'Эксклюзив'];
+
+    let metaModalGame = null;
+    let metaEditGenres = [];
+    let metaEditTags = [];
+
+    function openMetaModal(game) {
+      metaModalGame = game;
+      metaEditGenres = [...(game.customGenres || [])];
+      metaEditTags = [...(game.customTags || [])];
+      document.getElementById('meta-modal-subtitle').textContent = game.title;
+      document.getElementById('meta-add-genre-input').value = '';
+      document.getElementById('meta-add-tag-input').value = '';
+      renderMetaModal();
+      document.getElementById('meta-modal').classList.remove('hidden');
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function closeMetaModal() {
+      document.getElementById('meta-modal').classList.add('hidden');
+      metaModalGame = null;
+    }
+
+    function renderMetaModal() {
+      if (!metaModalGame) return;
+      const steamGenres = (metaModalGame.genres || []).filter(g => g !== 'Сторонняя игра' && !metaEditGenres.some(x => x.toLowerCase() === g.toLowerCase()));
+      const steamTags = (metaModalGame.tags || []).filter(t => !metaEditTags.some(x => x.toLowerCase() === t.toLowerCase()));
+
+      document.getElementById('meta-current-genres').innerHTML = [
+        ...steamGenres.map(g => `<span class="px-2.5 py-1 rounded-full text-xs bg-[#66c0f4]/10 border border-[#66c0f4]/25 text-[#9bd6f9]/80">${esc(g)} <span class="text-[10px] opacity-60">Steam</span></span>`),
+        ...metaEditGenres.map((g, i) => `<button type="button" data-rm-genre="${i}" class="px-2.5 py-1 rounded-full text-xs font-semibold bg-[#66c0f4]/22 border border-[#66c0f4]/55 text-white flex items-center gap-1 cursor-pointer">${esc(g)} <span class="text-[10px]">✕</span></button>`)
+      ].join('') || '<span class="text-xs text-slate-400">Жанры пока не указаны</span>';
+
+      document.getElementById('meta-current-tags').innerHTML = [
+        ...steamTags.map(t => `<span class="px-2.5 py-1 rounded-full text-xs bg-white/[0.06] border border-white/12 text-slate-300">${esc(t)} <span class="text-[10px] opacity-60">Steam</span></span>`),
+        ...metaEditTags.map((t, i) => `<button type="button" data-rm-tag="${i}" class="px-2.5 py-1 rounded-full text-xs font-semibold bg-[#d9ff00]/18 border border-[#d9ff00]/55 text-[#eaff66] flex items-center gap-1 cursor-pointer">#${esc(t)} <span class="text-[10px]">✕</span></button>`)
+      ].join('') || '<span class="text-xs text-slate-400">Метки пока не указаны</span>';
+
+      document.getElementById('meta-quick-genres').innerHTML = QUICK_GENRES.map(g => {
+        const has = metaEditGenres.some(x => x.toLowerCase() === g.toLowerCase()) || steamGenres.some(x => x.toLowerCase() === g.toLowerCase());
+        return `<button type="button" data-q-genre="${esc(g)}" class="px-2.5 py-1 rounded-full text-[11px] border transition cursor-pointer ${has ? 'opacity-40 border-white/10 text-slate-400' : 'bg-white/[0.04] hover:bg-[#66c0f4]/20 border-white/12 text-slate-300 hover:text-white'}">+ ${esc(g)}</button>`;
+      }).join('');
+
+      document.getElementById('meta-quick-tags').innerHTML = QUICK_TAGS.map(t => {
+        const has = metaEditTags.some(x => x.toLowerCase() === t.toLowerCase()) || steamTags.some(x => x.toLowerCase() === t.toLowerCase());
+        return `<button type="button" data-q-tag="${esc(t)}" class="px-2.5 py-1 rounded-full text-[11px] border transition cursor-pointer ${has ? 'opacity-40 border-white/10 text-slate-400' : 'bg-white/[0.04] hover:bg-[#d9ff00]/18 border-white/12 text-slate-300 hover:text-[#eaff66]'}">+ ${esc(t)}</button>`;
+      }).join('');
+    }
+
+    function addMetaGenre(val) {
+      const clean = String(val || '').trim().slice(0, 40);
+      if (!clean || metaEditGenres.some(x => x.toLowerCase() === clean.toLowerCase())) return;
+      metaEditGenres.push(clean);
+      renderMetaModal();
+    }
+
+    function addMetaTag(val) {
+      const clean = String(val || '').trim().slice(0, 40);
+      if (!clean || metaEditTags.some(x => x.toLowerCase() === clean.toLowerCase())) return;
+      metaEditTags.push(clean);
+      renderMetaModal();
+    }
+
+    document.getElementById('btn-close-meta-modal').onclick = document.getElementById('btn-cancel-meta-modal').onclick = closeMetaModal;
+    document.getElementById('meta-modal').onclick = e => {
+      if (e.target.id === 'meta-modal') { closeMetaModal(); return; }
+      const rg = e.target.closest('[data-rm-genre]');
+      if (rg) { metaEditGenres.splice(Number(rg.dataset.rmGenre), 1); renderMetaModal(); return; }
+      const rt = e.target.closest('[data-rm-tag]');
+      if (rt) { metaEditTags.splice(Number(rt.dataset.rmTag), 1); renderMetaModal(); return; }
+      const qg = e.target.closest('[data-q-genre]');
+      if (qg) { addMetaGenre(qg.dataset.qGenre); return; }
+      const qt = e.target.closest('[data-q-tag]');
+      if (qt) { addMetaTag(qt.dataset.qTag); return; }
+    };
+    document.getElementById('btn-meta-add-genre').onclick = () => {
+      const inp = document.getElementById('meta-add-genre-input');
+      addMetaGenre(inp.value);
+      inp.value = '';
+      inp.focus();
+    };
+    document.getElementById('btn-meta-add-tag').onclick = () => {
+      const inp = document.getElementById('meta-add-tag-input');
+      addMetaTag(inp.value);
+      inp.value = '';
+      inp.focus();
+    };
+    document.getElementById('meta-add-genre-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); document.getElementById('btn-meta-add-genre').click(); }
+    });
+    document.getElementById('meta-add-tag-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); document.getElementById('btn-meta-add-tag').click(); }
+    });
+    document.getElementById('btn-save-meta-modal').onclick = async () => {
+      if (!metaModalGame) return;
+      const btn = document.getElementById('btn-save-meta-modal');
+      btn.disabled = true;
+      btn.textContent = 'Сохранение...';
+      try {
+        const r = await fetch('/api/games/meta', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            appId: metaModalGame.appId,
+            gameTitle: metaModalGame.title,
+            genres: metaEditGenres,
+            tags: metaEditTags
+          })
+        });
+        if (r.ok) {
+          const d = await r.json();
+          if (d && d.reviews) reviews = d.reviews;
+          closeMetaModal();
+          renderGamesCatalog(false);
+          showToast('Жанры и метки сохранены!');
+        } else {
+          showToast('Не удалось сохранить');
+        }
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Сохранить';
+      }
+    };
 
     boot();
   </script>
