@@ -1181,10 +1181,10 @@
       `;
     }
 
-    function renderCommentsDrawer(rev) {
+    function renderCommentsDrawer(rev, animateDrawer = false) {
       const replyTarget = replyingTo[rev.id] || null;
       return `
-        <div class="anim-drawer rounded-2xl bg-gradient-to-b from-black/35 to-black/20 border border-white/[0.11] p-3 sm:p-3.5 space-y-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+        <div class="${animateDrawer ? 'anim-drawer' : ''} rounded-2xl bg-gradient-to-b from-black/35 to-black/20 border border-white/[0.11] p-3 sm:p-3.5 space-y-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
           <div class="space-y-2">
             ${rev.comments.map(c => {
               const myCm = c.userId === currentUser.steam_id;
@@ -1267,10 +1267,10 @@
       });
     }
 
-    function updateCardComments(revId) {
+    function updateCardComments(revId, animateDrawer = false) {
       const rev = reviews.find(r => r.id === revId);
       if (!rev) return;
-      const html = openComments[revId] ? renderCommentsDrawer(rev) : '';
+      const html = openComments[revId] ? renderCommentsDrawer(rev, animateDrawer) : '';
       document.querySelectorAll(`[data-card-comments="${CSS.escape(revId)}"]`).forEach(el => {
         el.innerHTML = html;
       });
@@ -2771,7 +2771,7 @@
       if (tc) {
         const revId = tc.dataset.toggleComments;
         openComments[revId] = !openComments[revId];
-        updateCardComments(revId);
+        updateCardComments(revId, openComments[revId]);
         return;
       }
       const rsg = e.target.closest('[data-rate-same-game]');
@@ -2882,13 +2882,10 @@
       }).then(r => r.ok ? r.json() : null).then(d => {
         if (d && d.reviews) {
           reviews = d.reviews;
-          // Quietly update comment IDs in DOM without re-animating
-          const visibleTa = Array.from(document.querySelectorAll(`[data-comment-form="${CSS.escape(revId)}"] [name="text"]`)).find(el => el.offsetParent !== null);
-          const draftText = visibleTa ? visibleTa.value : '';
-          updateCardComments(revId);
-          if (draftText) {
-            const nextTa = Array.from(document.querySelectorAll(`[data-comment-form="${CSS.escape(revId)}"] [name="text"]`)).find(el => el.offsetParent !== null);
-            if (nextTa) nextTa.value = draftText;
+          if (d.id) {
+            // Silently swap temporary comment ID to real DB ID in-place (zero DOM rebuild / zero flicker!)
+            document.querySelectorAll(`[data-del-comment="${CSS.escape(tempId)}"]`).forEach(el => { el.dataset.delComment = d.id; });
+            document.querySelectorAll(`[data-reply-comment="${CSS.escape(tempId)}"]`).forEach(el => { el.dataset.replyComment = d.id; });
           }
         }
       }).catch(() => {
