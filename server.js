@@ -8,6 +8,8 @@ const PORT = process.env.PORT || 3000;
 const STEAM_API_KEY = (process.env.STEAM_API_KEY || '').trim().replace(/^["']|["']$/g, '');
 const SESSION_SECRET = (process.env.SESSION_SECRET || 'atoqcritics-dev-secret-change-me').trim();
 const DATABASE_URL = (process.env.DATABASE_URL || '').trim().replace(/^["']|["']$/g, '');
+const OPENCRITIC_API_KEY = (process.env.OPENCRITIC_API_KEY || process.env.RAPIDAPI_KEY || '').trim().replace(/^["']|["']$/g, '');
+const RAWG_API_KEY = (process.env.RAWG_API_KEY || '').trim().replace(/^["']|["']$/g, '');
 
 function getBaseUrl(req) {
   const host = (req.headers['x-forwarded-host'] || req.get('host') || '').split(',')[0].trim();
@@ -416,6 +418,29 @@ function normalizeTitleForMatch(t) {
     .trim();
 }
 
+function slugifyGameTitle(t) {
+  return String(t || '')
+    .toLowerCase()
+    .replace(/[™®©']/g, '')
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+async function fetchJsonWithTimeout(url, headers = {}, timeoutMs = 5000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { signal: controller.signal, headers });
+    clearTimeout(timer);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    clearTimeout(timer);
+    return null;
+  }
+}
+
 async function fetchMetacriticFromSteam(appId) {
   if (!appId || appId <= 0) return null;
   try {
@@ -434,55 +459,118 @@ async function fetchMetacriticFromSteam(appId) {
   return null;
 }
 
-async function fetchOpenCriticByTitle(gameTitle) {
+async function fetchMetacriticFromRawg(gameTitle) {
+  if (!RAWG_API_KEY) return null;
   const cleanQuery = String(gameTitle || '').replace(/[™®©]/g, '').trim();
   if (cleanQuery.length < 2) return null;
+  const url = `https://api.rawg.io/api/games?key=${encodeURIComponent(RAWG_API_KEY)}&search=${encodeURIComponent(cleanQuery)}&page_size=5`;
+  const data = await fetchJsonWithTimeout(url, { 'User-Agent': 'AToQcritics/1.0' }, 5000);
+  const results = data && Array.isArray(data.results) ? data.results : [];
+  if (!results.length) return null;
+  const normTarget = normalizeTitleForMatch(cleanQuery);
+  let best = results.find(x => normalizeTitleForMatch(x.name) === normTarget && Number(x.metacritic) > 0);
+  if (!best) best = results.find(x => Number(x.metacritic) > 0 && (normalizeTitleForMatch(x.name).includes(normTarget) || normTarget.includes(normalizeTitleForMatch(x.name))));
+  if (!best || !Number(best.metacritic)) return null;
+  const slug = slugifyGameTitle(best.name || cleanQuery);
+  return {
+    score: Math.min(100, Math.max(0, Math.round(Number(best.metacritic)))),
+    url: slug ? `https://www.metacritic.com/game/${slug}/` : null
+  };
+}
+
+async function fetchMetacriticFromWebJsonLd(gameTitle) {
+  const cleanQuery = String(gameTitle || '').replace(/[™®©]/g, '').trim();
+  const slug = slugifyGameTitle(cleanQuery);
+  if (!slug || slug.length < 2) return null;
+  const url = `https://www.metacritic.com/game/${slug}/`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000);
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 4500);
-    const searchRes = await fetch(`https://api.opencritic.com/api/game/search?criteria=${encodeURIComponent(cleanQuery)}`, {
+    const res = await fetch(url, {
       signal: controller.signal,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; AToQcritics/1.0)',
-        'Accept': 'application/json'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml'
       }
     });
     clearTimeout(timer);
-    if (!searchRes.ok) return null;
-    const results = await searchRes.json();
-    if (!Array.isArray(results) || !results.length) return null;
-
-    const normTarget = normalizeTitleForMatch(cleanQuery);
-    let best = results.find(x => normalizeTitleForMatch(x.name) === normTarget);
-    if (!best && results[0] && (results[0].dist === undefined || Number(results[0].dist) <= 0.14)) {
-      best = results[0];
+    if (!res.ok) return null;
+    const html = await res.text();
+    const ldMatches = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) || [];
+    for (const block of ldMatches) {
+      const inner = block.replace(/^<script[^>]*>/i, '').replace(/<\/script>$/i, '').trim();
+      try {
+        const obj = JSON.parse(inner);
+        const ar = obj && obj.aggregateRating;
+        const val = ar && Number(ar.ratingValue);
+        if (Number.isFinite(val) && val > 0 && val <= 100) {
+          return { score: Math.round(val), url };
+        }
+      } catch {}
     }
-    if (!best || !best.id) return null;
+  } catch {
+    clearTimeout(timer);
+  }
+  return null;
+}
 
-    const c2 = new AbortController();
-    const t2 = setTimeout(() => c2.abort(), 4500);
-    const detailRes = await fetch(`https://api.opencritic.com/api/game/${best.id}`, {
-      signal: c2.signal,
+async function fetchMetacriticBest(appId, gameTitle) {
+  const fromSteam = await fetchMetacriticFromSteam(appId);
+  if (fromSteam) return fromSteam;
+  const fromRawg = await fetchMetacriticFromRawg(gameTitle);
+  if (fromRawg) return fromRawg;
+  return await fetchMetacriticFromWebJsonLd(gameTitle);
+}
+
+async function fetchOpenCriticByTitle(gameTitle) {
+  const cleanQuery = String(gameTitle || '').replace(/[™®©]/g, '').trim();
+  if (cleanQuery.length < 2) return null;
+
+  const hosts = [];
+  if (OPENCRITIC_API_KEY) {
+    hosts.push({
+      base: 'https://opencritic-api.p.rapidapi.com',
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; AToQcritics/1.0)',
+        'x-rapidapi-key': OPENCRITIC_API_KEY,
+        'x-rapidapi-host': 'opencritic-api.p.rapidapi.com',
         'Accept': 'application/json'
       }
     });
-    clearTimeout(t2);
-    if (!detailRes.ok) return null;
-    const detail = await detailRes.json();
+  }
+  hosts.push({
+    base: 'https://api.opencritic.com/api',
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+      'Accept': 'application/json',
+      'Referer': 'https://opencritic.com/'
+    }
+  });
+
+  const normTarget = normalizeTitleForMatch(cleanQuery);
+  for (const h of hosts) {
+    const results = await fetchJsonWithTimeout(`${h.base}/game/search?criteria=${encodeURIComponent(cleanQuery)}`, h.headers, 5000);
+    if (!Array.isArray(results) || !results.length) continue;
+
+    let best = results.find(x => normalizeTitleForMatch(x.name) === normTarget);
+    if (!best) best = results.find(x => {
+      const n = normalizeTitleForMatch(x.name);
+      return n.includes(normTarget) || normTarget.includes(n);
+    });
+    if (!best && results[0] && (results[0].dist === undefined || Number(results[0].dist) <= 0.16)) {
+      best = results[0];
+    }
+    if (!best || !best.id) continue;
+
+    const detail = await fetchJsonWithTimeout(`${h.base}/game/${best.id}`, h.headers, 5000);
     const rawScore = Number(detail && detail.topCriticScore);
-    if (!Number.isFinite(rawScore) || rawScore < 0) return null;
-    const slug = String(detail.name || best.name || 'game')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '') || 'game';
+    if (!Number.isFinite(rawScore) || rawScore < 0) continue;
+    const slug = slugifyGameTitle(detail.name || best.name || 'game') || 'game';
     return {
       score: Math.min(100, Math.max(0, Math.round(rawScore))),
       tier: detail.tier || null,
       url: `https://opencritic.com/game/${best.id}/${slug}`
     };
-  } catch {}
+  }
   return null;
 }
 
@@ -495,15 +583,18 @@ async function ensureExternalRatings(appId, gameTitle, force = false) {
   try {
     const existing = await pool.query('SELECT * FROM game_external_ratings WHERE game_key = $1', [gKey]);
     const row = existing.rows[0];
-    const FRESH_MS = 14 * 24 * 60 * 60 * 1000;
+    const hasBoth = row && row.mc_score !== null && row.oc_score !== null;
+    const FRESH_MS = hasBoth ? (14 * 24 * 60 * 60 * 1000) : (6 * 60 * 60 * 1000);
     if (row && !force) {
       if (row.manual_override) return row;
       if ((Date.now() - Number(row.updated_at || 0)) < FRESH_MS) return row;
     }
 
+    const needMc = force || !row || row.mc_score === null;
+    const needOc = force || !row || row.oc_score === null;
     const [mc, oc] = await Promise.all([
-      fetchMetacriticFromSteam(numAppId),
-      fetchOpenCriticByTitle(cleanTitle)
+      needMc ? fetchMetacriticBest(numAppId, cleanTitle) : Promise.resolve(null),
+      needOc ? fetchOpenCriticByTitle(cleanTitle) : Promise.resolve(null)
     ]);
 
     const finalMcScore = mc ? mc.score : (row && !force ? row.mc_score : null);
@@ -541,18 +632,20 @@ async function ensureExternalRatings(appId, gameTitle, force = false) {
 async function backfillExternalRatings() {
   try {
     const { rows } = await pool.query(`
-      SELECT DISTINCT ON (CASE WHEN r.app_id > 0 THEN 'steam_' || r.app_id::text ELSE 'custom_' || LOWER(TRIM(r.game_title)) END)
-        r.app_id, r.game_title,
-        CASE WHEN r.app_id > 0 THEN 'steam_' || r.app_id::text ELSE 'custom_' || LOWER(TRIM(r.game_title)) END AS gkey
-      FROM reviews r
-      LEFT JOIN game_external_ratings er
-        ON er.game_key = (CASE WHEN r.app_id > 0 THEN 'steam_' || r.app_id::text ELSE 'custom_' || LOWER(TRIM(r.game_title)) END)
-      WHERE er.game_key IS NULL
-      LIMIT 150
+      SELECT DISTINCT ON (gkey) app_id, game_title, gkey, latest_at
+      FROM (
+        SELECT r.app_id, r.game_title, r.created_at AS latest_at,
+          CASE WHEN r.app_id > 0 THEN 'steam_' || r.app_id::text ELSE 'custom_' || LOWER(TRIM(r.game_title)) END AS gkey
+        FROM reviews r
+      ) sub
+      LEFT JOIN game_external_ratings er ON er.game_key = sub.gkey
+      WHERE er.game_key IS NULL OR (er.manual_override IS NOT TRUE AND (er.mc_score IS NULL OR er.oc_score IS NULL))
+      ORDER BY gkey, latest_at DESC
+      LIMIT 40
     `);
     for (const row of rows) {
-      await ensureExternalRatings(row.app_id, row.game_title, false);
-      await new Promise(res => setTimeout(res, 650));
+      await ensureExternalRatings(row.app_id, row.game_title, true);
+      await new Promise(res => setTimeout(res, 750));
     }
   } catch {}
 }
