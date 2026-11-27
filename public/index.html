@@ -817,6 +817,24 @@
           </div>
           <div id="meta-quick-tags" class="flex flex-wrap gap-1.5 pt-0.5"></div>
         </div>
+
+        <!-- External Critics Ratings (Optional Override / Auto-Refresh) -->
+        <div class="pt-3 border-t border-white/10 space-y-2.5">
+          <div class="flex items-center justify-between gap-2">
+            <div class="text-xs font-bold uppercase tracking-wider text-slate-300">Рейтинги критиков (доп. инфа)</div>
+            <button id="btn-meta-refresh-ratings" type="button" class="liquid-pill px-2.5 py-1 rounded-full text-[11px] font-semibold text-[#66c0f4] hover:text-white cursor-pointer">🔄 Подтянуть авто</button>
+          </div>
+          <div class="grid grid-cols-2 gap-2.5">
+            <label class="space-y-1">
+              <span class="text-[11px] text-slate-400">Metacritic (0–100)</span>
+              <input id="meta-mc-score" type="number" min="0" max="100" placeholder="—" class="w-full px-3 py-2 rounded-2xl bg-white/[0.07] border border-white/15 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#d9ff00] tabular-nums" />
+            </label>
+            <label class="space-y-1">
+              <span class="text-[11px] text-slate-400">OpenCritic (0–100)</span>
+              <input id="meta-oc-score" type="number" min="0" max="100" placeholder="—" class="w-full px-3 py-2 rounded-2xl bg-white/[0.07] border border-white/15 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#d9ff00] tabular-nums" />
+            </label>
+          </div>
+        </div>
       </div>
 
       <div class="px-5 py-3.5 border-t border-white/10 flex justify-end gap-2">
@@ -1269,6 +1287,58 @@
       }
     }
 
+    function renderExternalRatingPills(ext, siteScore = null, showDelta = false) {
+      if (!ext) return '';
+      const hasMc = ext.mcScore !== null && ext.mcScore !== undefined;
+      const hasOc = ext.ocScore !== null && ext.ocScore !== undefined;
+      if (!hasMc && !hasOc) return '';
+
+      const scoreDot = s => s >= 75 ? '#38e8b0' : (s >= 50 ? '#fbbf24' : '#fb7185');
+      const ocTierDot = (t, s) => {
+        const k = String(t || '').toLowerCase();
+        if (k === 'mighty') return '#d9ff00';
+        if (k === 'strong') return '#38e8b0';
+        if (k === 'fair') return '#fbbf24';
+        if (k === 'weak') return '#fb7185';
+        return scoreDot(s);
+      };
+
+      const parts = [];
+      if (hasMc) {
+        const s = Number(ext.mcScore);
+        const inner = `<span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:${scoreDot(s)};"></span><span class="text-slate-400 font-semibold">MC</span><span class="text-slate-100 font-bold tabular-nums">${s}</span>`;
+        parts.push(ext.mcUrl
+          ? `<a href="${esc(ext.mcUrl)}" target="_blank" rel="noopener" title="Metacritic: ${s}/100" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] bg-white/[0.04] hover:bg-white/[0.10] border border-white/10 transition">${inner}</a>`
+          : `<span title="Metacritic: ${s}/100" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] bg-white/[0.04] border border-white/10">${inner}</span>`);
+      }
+      if (hasOc) {
+        const s = Number(ext.ocScore);
+        const tierLbl = ext.ocTier ? ` (${ext.ocTier})` : '';
+        const inner = `<span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:${ocTierDot(ext.ocTier, s)};"></span><span class="text-slate-400 font-semibold">OC</span><span class="text-slate-100 font-bold tabular-nums">${s}</span>`;
+        parts.push(ext.ocUrl
+          ? `<a href="${esc(ext.ocUrl)}" target="_blank" rel="noopener" title="OpenCritic: ${s}/100${tierLbl}" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] bg-white/[0.04] hover:bg-white/[0.10] border border-white/10 transition">${inner}</a>`
+          : `<span title="OpenCritic: ${s}/100${tierLbl}" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] bg-white/[0.04] border border-white/10">${inner}</span>`);
+      }
+
+      if (showDelta && siteScore !== null && siteScore !== undefined) {
+        const criticScores = [];
+        if (hasMc) criticScores.push(Number(ext.mcScore));
+        if (hasOc) criticScores.push(Number(ext.ocScore));
+        if (criticScores.length) {
+          const avgCritic = Math.round(criticScores.reduce((a, b) => a + b, 0) / criticScores.length);
+          const diff = Math.round(Number(siteScore)) - avgCritic;
+          if (Math.abs(diff) >= 3) {
+            const sign = diff > 0 ? '+' : '';
+            const cls = diff > 0
+              ? 'text-[#9bd6f9]/90 bg-[#66c0f4]/10 border-[#66c0f4]/20'
+              : 'text-rose-300/90 bg-rose-500/10 border-rose-400/20';
+            parts.push(`<span title="Разница между оценкой AToQcritics (${Math.round(siteScore)}) и критиками (${avgCritic})" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border ${cls} tabular-nums">${sign}${diff} к критикам</span>`);
+          }
+        }
+      }
+      return parts.join('');
+    }
+
     function renderAchievementsBadge(rev) {
       if (!rev.achTotal || rev.achTotal <= 0 || rev.achUnlocked === null || rev.achUnlocked === undefined) return '';
       const isPerfect = rev.achUnlocked >= rev.achTotal;
@@ -1543,6 +1613,7 @@
                     </button>
                     ${rev.hoursPlayed ? `<span class="text-sm font-semibold text-[#7ccaf8]">• ${rev.hoursPlayed} ч.</span>` : ''}
                     ${renderAchievementsBadge(rev)}
+                    ${renderExternalRatingPills(rev.externalRatings, null, false)}
                   </div>
                 </div>
                 <!-- Metacritic-style colored background score badge with site-obsidian numbers -->
@@ -1806,6 +1877,7 @@
             tags: new Set(),
             customGenres: new Set(),
             customTags: new Set(),
+            externalRatings: r.externalRatings || null,
             reviews: [],
             latestAt: 0
           });
@@ -1813,6 +1885,7 @@
         const g = map.get(key);
         g.reviews.push(r);
         if (!g.img && r.gameImg) g.img = r.gameImg;
+        if (!g.externalRatings && r.externalRatings) g.externalRatings = r.externalRatings;
         if (r.createdAt > g.latestAt) g.latestAt = r.createdAt;
         (r.gameGenres || []).forEach(x => g.genres.add(x));
         (r.gameTags || []).forEach(x => g.tags.add(x));
@@ -1829,6 +1902,7 @@
           tags: Array.from(g.tags),
           customGenres: Array.from(g.customGenres),
           customTags: Array.from(g.customTags),
+          externalRatings: g.externalRatings,
           count,
           avg,
           cat
@@ -2029,6 +2103,7 @@
                         </div>
                         <span class="text-xs text-slate-400 font-medium">${g.count} ${g.count === 1 ? 'оценка' : (g.count < 5 ? 'оценки' : 'оценок')}</span>
                       </div>
+                      ${renderExternalRatingPills(g.externalRatings, g.avg, true) ? `<div class="flex items-center gap-1.5 mt-1.5 flex-wrap">${renderExternalRatingPills(g.externalRatings, g.avg, true)}</div>` : ''}
                     </div>
                     <div class="rounded-2xl min-w-[58px] px-2.5 py-2 text-center shrink-0" style="background:${m.bg}; box-shadow:${m.shadow};">
                       <div class="text-2xl font-black leading-none text-[#090c12] tabular-nums">${g.avg}</div>
@@ -3609,6 +3684,11 @@
       document.getElementById('meta-modal-subtitle').textContent = game.title;
       document.getElementById('meta-add-genre-input').value = '';
       document.getElementById('meta-add-tag-input').value = '';
+      const ext = game.externalRatings || {};
+      const mcInp = document.getElementById('meta-mc-score');
+      const ocInp = document.getElementById('meta-oc-score');
+      if (mcInp) { mcInp.value = ext.mcScore ?? ''; mcInp.dataset.orig = String(ext.mcScore ?? ''); }
+      if (ocInp) { ocInp.value = ext.ocScore ?? ''; ocInp.dataset.orig = String(ext.ocScore ?? ''); }
       renderMetaModal();
       document.getElementById('meta-modal').classList.remove('hidden');
       if (window.lucide) lucide.createIcons();
@@ -3689,6 +3769,37 @@
     document.getElementById('meta-add-tag-input').addEventListener('keydown', e => {
       if (e.key === 'Enter') { e.preventDefault(); document.getElementById('btn-meta-add-tag').click(); }
     });
+    document.getElementById('btn-meta-refresh-ratings').onclick = async () => {
+      if (!metaModalGame) return;
+      const b = document.getElementById('btn-meta-refresh-ratings');
+      b.disabled = true;
+      b.textContent = 'Загрузка...';
+      try {
+        const r = await fetch('/api/games/ratings/refresh', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ appId: metaModalGame.appId, gameTitle: metaModalGame.title })
+        });
+        const d = await r.json().catch(() => ({}));
+        if (r.ok && d) {
+          if (d.reviews) reviews = d.reviews;
+          const rt = d.ratings || {};
+          const mcInp = document.getElementById('meta-mc-score');
+          const ocInp = document.getElementById('meta-oc-score');
+          if (mcInp) { mcInp.value = rt.mcScore ?? ''; mcInp.dataset.orig = String(rt.mcScore ?? ''); }
+          if (ocInp) { ocInp.value = rt.ocScore ?? ''; ocInp.dataset.orig = String(rt.ocScore ?? ''); }
+          renderApp(false);
+          showToast((rt.mcScore != null || rt.ocScore != null) ? 'Рейтинги критиков обновлены' : 'Оценки на MC/OC не найдены — можно указать вручную');
+        } else {
+          showToast('Не удалось обновить рейтинги');
+        }
+      } catch {
+        showToast('Ошибка сети');
+      } finally {
+        b.disabled = false;
+        b.textContent = '🔄 Подтянуть авто';
+      }
+    };
     document.getElementById('btn-save-meta-modal').onclick = async () => {
       if (!metaModalGame) return;
       const btn = document.getElementById('btn-save-meta-modal');
@@ -3702,7 +3813,11 @@
             appId: metaModalGame.appId,
             gameTitle: metaModalGame.title,
             genres: metaEditGenres,
-            tags: metaEditTags
+            tags: metaEditTags,
+            mcScore: document.getElementById('meta-mc-score')?.value ?? '',
+            ocScore: document.getElementById('meta-oc-score')?.value ?? '',
+            updateRatings: (document.getElementById('meta-mc-score')?.value !== document.getElementById('meta-mc-score')?.dataset.orig)
+              || (document.getElementById('meta-oc-score')?.value !== document.getElementById('meta-oc-score')?.dataset.orig)
           })
         });
         if (r.ok) {
