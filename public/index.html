@@ -2502,12 +2502,15 @@
           if (retry) retry.onclick = async () => { status.textContent = 'Загрузка библиотеки Steam...'; await loadMyLibrary(); renderSearchResults(false, true); };
           return;
         }
-        const allFiltered = myLibrary.filter(g => !q || g.title.toLowerCase().includes(q.toLowerCase()));
+        const baseLib = modalMode === 'review'
+          ? myLibrary.filter(g => !hasUserReviewedGame(g.appId, g.title))
+          : myLibrary;
+        const allFiltered = baseLib.filter(g => !q || g.title.toLowerCase().includes(q.toLowerCase()));
         const totalPages = Math.max(1, Math.ceil(allFiltered.length / MODAL_PAGE_SIZE));
         if (modalSearchPage > totalPages) modalSearchPage = totalPages;
         const start = (modalSearchPage - 1) * MODAL_PAGE_SIZE;
         const pageItems = allFiltered.slice(start, start + MODAL_PAGE_SIZE);
-        status.innerHTML = `${q ? `Найдено в библиотеке: ${allFiltered.length}` : `В вашей библиотеке Steam: ${myLibrary.length} игр`}${totalPages > 1 ? ` · стр. ${modalSearchPage} из ${totalPages}` : ''} <button type="button" id="btn-retry-lib" class="ml-2 underline text-[#66c0f4] cursor-pointer">Обновить</button>`;
+        status.innerHTML = `${q ? `Доступно в библиотеке: ${allFiltered.length}` : (modalMode === 'review' ? `Без обзора в библиотеке: ${baseLib.length} из ${myLibrary.length}` : `В вашей библиотеке Steam: ${myLibrary.length} игр`)}${totalPages > 1 ? ` · стр. ${modalSearchPage} из ${totalPages}` : ''} <button type="button" id="btn-retry-lib" class="ml-2 underline text-[#66c0f4] cursor-pointer">Обновить</button>`;
         const retry = document.getElementById('btn-retry-lib');
         if (retry) retry.onclick = async () => { status.textContent = 'Обновление библиотеки Steam...'; await loadMyLibrary(); renderSearchResults(false, true); };
         box.innerHTML = renderGameButtons(pageItems, true, animate);
@@ -2524,10 +2527,13 @@
           if (mySeq !== steamSearchSeq) return;
           const d = await r.json();
           if (mySeq !== steamSearchSeq) return;
-          const list = d.games || [];
+          const rawList = d.games || [];
+          const list = modalMode === 'review' ? rawList.filter(g => !hasUserReviewedGame(g.appId, g.title)) : rawList;
           const totalPages = d.totalPages || 50;
           status.textContent = `Популярные игры Steam · стр. ${modalSearchPage} из ${totalPages}`;
-          box.innerHTML = renderGameButtons(list, false, animate);
+          box.innerHTML = list.length
+            ? renderGameButtons(list, false, animate)
+            : '<div class="col-span-full py-6 text-center text-xs text-slate-400">Все игры на этой странице уже оценены — перейдите на следующую страницу.</div>';
           renderModalPagination(modalSearchPage, totalPages);
         } catch {
           if (mySeq !== steamSearchSeq) return;
@@ -2550,12 +2556,15 @@
         lastSteamSearchQuery = q;
         lastSteamSearchItems = list;
       }
-      const totalPages = Math.max(1, Math.ceil(list.length / MODAL_PAGE_SIZE));
+      const filteredSearch = modalMode === 'review' ? list.filter(g => !hasUserReviewedGame(g.appId, g.title)) : list;
+      const totalPages = Math.max(1, Math.ceil(filteredSearch.length / MODAL_PAGE_SIZE));
       if (modalSearchPage > totalPages) modalSearchPage = totalPages;
       const start = (modalSearchPage - 1) * MODAL_PAGE_SIZE;
-      const pageItems = list.slice(start, start + MODAL_PAGE_SIZE);
-      status.textContent = `Найдено в Steam: ${list.length}${totalPages > 1 ? ` · стр. ${modalSearchPage} из ${totalPages}` : ''}`;
-      box.innerHTML = renderGameButtons(pageItems, false, animate);
+      const pageItems = filteredSearch.slice(start, start + MODAL_PAGE_SIZE);
+      status.textContent = `Найдено в Steam: ${filteredSearch.length}${totalPages > 1 ? ` · стр. ${modalSearchPage} из ${totalPages}` : ''}`;
+      box.innerHTML = pageItems.length
+        ? renderGameButtons(pageItems, false, animate)
+        : `<div class="col-span-full py-6 text-center text-xs text-slate-400">${list.length ? 'Все найденные игры уже оценены вами.' : 'Игры по этому запросу не найдены.'}</div>`;
       renderModalPagination(modalSearchPage, totalPages);
     }
 
