@@ -2936,11 +2936,13 @@
         }
       } else {
         const tmpRevId = 'rev_tmp_' + Date.now();
-        lastPublishedReviewId = tmpRevId;
+        const hadPrefetchedRatings = Boolean(prefetchedRatings && (prefetchedRatings.mcScore != null || prefetchedRatings.ocScore != null));
+        lastPublishedReviewId = hadPrefetchedRatings ? tmpRevId : null;
+        window._hadPrefetchedOnPublish = hadPrefetchedRatings;
         reviews.unshift({
           id: tmpRevId,
           externalRatings: prefetchedRatings || null,
-          _loadingRatings: !prefetchedRatings,
+          _loadingRatings: !hadPrefetchedRatings,
           userId: currentUser.steam_id,
           authorName: currentUser.name,
           authorAvatar: currentUser.avatar || '/logo.jpg',
@@ -3010,10 +3012,12 @@
           }
         }
         if (respData.reviews) {
-          if (respData.id) lastPublishedReviewId = respData.id;
+          // Only animate badges on server response if they were NOT already animated from prefetch!
+          lastPublishedReviewId = (!window._hadPrefetchedOnPublish && respData.id) ? respData.id : null;
+          window._hadPrefetchedOnPublish = false;
           reviews = respData.reviews;
           renderApp(false);
-          setTimeout(() => { lastPublishedReviewId = null; }, 900);
+          if (lastPublishedReviewId) setTimeout(() => { lastPublishedReviewId = null; }, 600);
         }
       }).catch(() => {
         reviews = prevReviewsBackup;
