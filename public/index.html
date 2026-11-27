@@ -561,7 +561,7 @@
             <div id="games-cat-pills" class="flex flex-wrap items-center gap-1.5"></div>
             <button id="btn-toggle-games-filters" type="button" class="liquid-pill px-3.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 cursor-pointer shrink-0">
               <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5 text-[#66c0f4]"></i>
-              <span>Жанры и метки</span>
+              <span>Жанры, метки и теги</span>
               <span id="games-active-filter-badge" class="hidden px-1.5 py-0.2 rounded-full bg-[#d9ff00] text-[#090c12] text-[10px] font-black">0</span>
             </button>
           </div>
@@ -581,14 +581,22 @@
 
             <div class="border-t border-white/[0.08] pt-3 space-y-2">
               <div class="flex flex-wrap items-center justify-between gap-2">
-                <span class="text-[11px] font-bold uppercase tracking-wider text-[#d9ff00]">Метки Steam</span>
+                <span class="text-[11px] font-bold uppercase tracking-wider text-[#38e8b0]">Метки</span>
                 <div class="relative w-full sm:w-56">
-                  <input id="games-tag-search" type="search" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Найти метку..." class="w-full pl-3 pr-8 py-1.5 rounded-full bg-white/[0.07] border border-white/12 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-[#d9ff00] transition" />
+                  <input id="games-tag-search" type="search" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Найти метку..." class="w-full pl-3 pr-8 py-1.5 rounded-full bg-white/[0.07] border border-white/12 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-[#38e8b0] transition" />
                   <button id="clear-games-tag-search" type="button" class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-slate-400 hover:text-white cursor-pointer">✕</button>
                 </div>
               </div>
               <div id="games-tags-strip" class="flex flex-wrap items-center gap-1.5"></div>
               <button id="btn-toggle-all-tags" type="button" class="hidden text-[11px] font-semibold text-[#7ccaf8] hover:text-[#d9ff00] cursor-pointer"></button>
+            </div>
+
+            <div id="games-community-tags-section" class="hidden border-t border-white/[0.08] pt-3 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-[#d9ff00]">Теги</span>
+                <span class="text-[11px] text-slate-400">Пользовательские теги</span>
+              </div>
+              <div id="games-community-tags-strip" class="flex flex-wrap items-center gap-1.5"></div>
             </div>
           </div>
         </div>
@@ -789,7 +797,7 @@
     <div class="liquid-glass-strong anim-modal-panel w-full max-w-xl max-h-[90dvh] rounded-t-[28px] sm:rounded-[30px] flex flex-col overflow-hidden pb-[env(safe-area-inset-bottom)]">
       <div class="px-5 py-4 border-b border-white/10 flex items-center justify-between gap-3">
         <div class="min-w-0">
-          <h2 class="text-base sm:text-lg font-bold text-white truncate">Жанры и метки игры</h2>
+          <h2 class="text-base sm:text-lg font-bold text-white truncate">Жанры, метки и теги</h2>
           <p id="meta-modal-subtitle" class="text-xs text-slate-400 truncate"></p>
         </div>
         <button id="btn-close-meta-modal" type="button" class="liquid-pill p-2 rounded-full cursor-pointer shrink-0"><i data-lucide="x" class="w-4 h-4"></i></button>
@@ -807,9 +815,20 @@
           <div id="meta-quick-genres" class="flex flex-wrap gap-1.5 pt-0.5"></div>
         </div>
 
-        <!-- User Tags / Метки Editor -->
+        <!-- Labels / Метки Editor (Steam + Custom Labels) -->
         <div class="border-t border-white/10 pt-4 space-y-2.5">
-          <div class="text-xs font-bold uppercase tracking-wider text-[#d9ff00]">Метки и теги</div>
+          <div class="text-xs font-bold uppercase tracking-wider text-[#38e8b0]">Метки</div>
+          <div id="meta-current-labels" class="flex flex-wrap gap-1.5"></div>
+          <div class="flex gap-2">
+            <input id="meta-add-label-input" type="text" maxlength="40" placeholder="Добавить свою метку..." class="flex-1 min-w-0 px-3.5 py-2 rounded-full bg-white/[0.07] border border-white/15 text-xs sm:text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#38e8b0]" />
+            <button id="btn-meta-add-label" type="button" class="liquid-pill px-4 py-2 rounded-full text-xs font-bold text-[#38e8b0] cursor-pointer shrink-0">+ Добавить</button>
+          </div>
+          <div id="meta-quick-labels" class="flex flex-wrap gap-1.5 pt-0.5"></div>
+        </div>
+
+        <!-- Community Tags / Теги Editor -->
+        <div class="border-t border-white/10 pt-4 space-y-2.5">
+          <div class="text-xs font-bold uppercase tracking-wider text-[#d9ff00]">Теги</div>
           <div id="meta-current-tags" class="flex flex-wrap gap-1.5"></div>
           <div class="flex gap-2">
             <input id="meta-add-tag-input" type="text" maxlength="40" placeholder="Например: Похожа на Dark Souls..." class="flex-1 min-w-0 px-3.5 py-2 rounded-full bg-white/[0.07] border border-white/15 text-xs sm:text-sm text-white placeholder-slate-400 focus:outline-none focus:border-[#d9ff00]" />
@@ -818,10 +837,13 @@
           <div id="meta-quick-tags" class="flex flex-wrap gap-1.5 pt-0.5"></div>
         </div>
 
-        <!-- External Critics Ratings (Optional Override / Auto-Refresh) -->
-        <div class="pt-3 border-t border-white/10 space-y-2.5">
+        <!-- External Critics Ratings (Admin Only) -->
+        <div id="meta-admin-ratings-wrap" class="hidden pt-3 border-t border-white/10 space-y-2.5">
           <div class="flex items-center justify-between gap-2">
-            <div class="text-xs font-bold uppercase tracking-wider text-slate-300">Рейтинги критиков (доп. инфа)</div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-300">Рейтинги критиков</span>
+              <span class="px-1.5 py-0.5 rounded-md text-[9px] font-black tracking-wider bg-[#d9ff00]/15 text-[#d9ff00] border border-[#d9ff00]/35">ADMIN</span>
+            </div>
             <button id="btn-meta-refresh-ratings" type="button" class="liquid-pill px-2.5 py-1 rounded-full text-[11px] font-semibold text-[#66c0f4] hover:text-white cursor-pointer">🔄 Подтянуть авто</button>
           </div>
           <div class="grid grid-cols-2 gap-2.5">
@@ -873,7 +895,7 @@
 
     let currentUser = null, users = [], reviews = [], myLibrary = [], libraryPrivate = false, libraryError = '';
     let notifications = [], notifFilter = 'all', notifOpen = false;
-    let gamesSubTab = 'best', gamesCatFilter = 'all', gamesSelectedGenres = new Set(), gamesSelectedTags = new Set(), gamesFiltersOpen = false, gamesShowAllTags = false;
+    let gamesSubTab = 'best', gamesCatFilter = 'all', gamesSelectedGenres = new Set(), gamesSelectedTags = new Set(), gamesSelectedCommunityTags = new Set(), gamesFiltersOpen = false, gamesShowAllTags = false;
     let userGameLists = [], profileSubTab = 'reviews', profileListSort = 'custom', selectedSwapListId = null, modalMode = 'review';
     let activeView = 'home', profileUserId = null, searchTab = 'all', selectedGame = null, editingReviewId = null;
     let lastDisplayedGames = [];
@@ -1884,8 +1906,10 @@
             title: r.gameTitle,
             img: r.gameImg,
             genres: new Set(),
+            labels: new Set(),
             tags: new Set(),
             customGenres: new Set(),
+            customLabels: new Set(),
             customTags: new Set(),
             externalRatings: r.externalRatings || null,
             reviews: [],
@@ -1898,8 +1922,10 @@
         if (!g.externalRatings && r.externalRatings) g.externalRatings = r.externalRatings;
         if (r.createdAt > g.latestAt) g.latestAt = r.createdAt;
         (r.gameGenres || []).forEach(x => g.genres.add(x));
+        (r.gameLabels || []).forEach(x => g.labels.add(x));
         (r.gameTags || []).forEach(x => g.tags.add(x));
         (r.customGenres || []).forEach(x => g.customGenres.add(x));
+        (r.customLabels || []).forEach(x => g.customLabels.add(x));
         (r.customTags || []).forEach(x => g.customTags.add(x));
       });
       return Array.from(map.values()).map(g => {
@@ -1909,8 +1935,10 @@
         return {
           ...g,
           genres: Array.from(g.genres),
+          labels: Array.from(g.labels),
           tags: Array.from(g.tags),
           customGenres: Array.from(g.customGenres),
+          customLabels: Array.from(g.customLabels),
           customTags: Array.from(g.customTags),
           externalRatings: g.externalRatings,
           count,
@@ -1943,7 +1971,7 @@
       `).join('');
 
       // Active filters badge & removable chips
-      const activeCount = gamesSelectedGenres.size + gamesSelectedTags.size;
+      const activeCount = gamesSelectedGenres.size + gamesSelectedTags.size + gamesSelectedCommunityTags.size;
       const filterBadge = document.getElementById('games-active-filter-badge');
       const filterBtn = document.getElementById('btn-toggle-games-filters');
       filterBadge.textContent = String(activeCount);
@@ -1975,6 +2003,7 @@
           resetBtn.onclick = () => {
             gamesSelectedGenres.clear();
             gamesSelectedTags.clear();
+      gamesSelectedCommunityTags.clear();
             renderGamesCatalog(false);
           };
         }
@@ -1999,7 +2028,9 @@
 
       // Collect Steam User Tags ("Метки") sorted by frequency + filter by mini tag search
       const tagCounts = new Map();
-      allGames.forEach(g => g.tags.forEach(t => tagCounts.set(t, (tagCounts.get(t) || 0) + 1)));
+      allGames.forEach(g => g.labels.forEach(t => tagCounts.set(t, (tagCounts.get(t) || 0) + 1)));
+      const cTagCounts = new Map();
+      allGames.forEach(g => g.tags.forEach(t => cTagCounts.set(t, (cTagCounts.get(t) || 0) + 1)));
       const tagQ = (document.getElementById('games-tag-search')?.value || '').trim().toLowerCase();
       let sortedTags = Array.from(tagCounts.entries()).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
       if (tagQ) sortedTags = sortedTags.filter(([t]) => t.toLowerCase().includes(tagQ));
@@ -2022,6 +2053,22 @@
         toggleAllTagsBtn.classList.add('hidden');
       }
 
+      const cTagSec = document.getElementById('games-community-tags-section');
+      const cTagStrip = document.getElementById('games-community-tags-strip');
+      const sortedCTags = Array.from(cTagCounts.entries()).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+      if (cTagSec && cTagStrip) {
+        if (sortedCTags.length) {
+          cTagSec.classList.remove('hidden');
+          cTagStrip.innerHTML = sortedCTags.map(([tg, cnt]) => {
+            const active = gamesSelectedCommunityTags.has(tg);
+            return `<button type="button" data-games-ctag="${esc(tg)}" class="px-2.5 py-1 rounded-full text-[11px] font-semibold border transition cursor-pointer ${active ? 'bg-[#d9ff00]/22 border-[#d9ff00]/70 text-[#eaff66]' : 'bg-white/[0.04] hover:bg-white/[0.11] border-white/12 text-slate-300 hover:text-white'}">#${esc(tg)} <span class="opacity-65 tabular-nums">${cnt}</span></button>`;
+          }).join('');
+        } else {
+          cTagSec.classList.add('hidden');
+          cTagStrip.innerHTML = '';
+        }
+      }
+
       // Filter & Sort Games (Multi-select AND across genres & tags)
       const q = (document.getElementById('games-search')?.value || '').trim().toLowerCase();
       const titleEl = document.getElementById('games-view-title');
@@ -2036,10 +2083,13 @@
         for (const gn of gamesSelectedGenres) {
           if (!g.genres.includes(gn)) return false;
         }
-        for (const tg of gamesSelectedTags) {
+        for (const lb of gamesSelectedTags) {
+          if (!g.labels.includes(lb)) return false;
+        }
+        for (const tg of gamesSelectedCommunityTags) {
           if (!g.tags.includes(tg)) return false;
         }
-        if (q && !g.title.toLowerCase().includes(q) && !g.genres.some(x => x.toLowerCase().includes(q)) && !g.tags.some(x => x.toLowerCase().includes(q))) return false;
+        if (q && !g.title.toLowerCase().includes(q) && !g.genres.some(x => x.toLowerCase().includes(q)) && !g.labels.some(x => x.toLowerCase().includes(q)) && !g.tags.some(x => x.toLowerCase().includes(q))) return false;
         return true;
       });
 
@@ -2087,10 +2137,11 @@
           `;
         }).filter(Boolean).join('');
 
-        // Compact, uncluttered pills on card: up to 2 genres (Steam blue) + up to 3 top user tags (subtle glass)
+        // Compact, uncluttered pills on card: Genres (blue) + Labels (emerald glass) + Community Tags (lime #tag)
         const cardPills = [
           ...g.genres.slice(0, 2).map(gn => `<button type="button" data-games-genre="${esc(gn)}" class="px-2.5 py-0.5 rounded-full text-[11px] bg-[#66c0f4]/12 hover:bg-[#66c0f4]/24 border border-[#66c0f4]/30 text-[#9bd6f9] transition cursor-pointer">${esc(gn)}</button>`),
-          ...g.tags.slice(0, 3).map(tg => `<button type="button" data-games-tag="${esc(tg)}" class="px-2.5 py-0.5 rounded-full text-[11px] bg-white/[0.06] hover:bg-white/[0.14] border border-white/10 text-slate-300 hover:text-white transition cursor-pointer">${esc(tg)}</button>`)
+          ...g.labels.slice(0, 3).map(lb => `<button type="button" data-games-tag="${esc(lb)}" class="px-2.5 py-0.5 rounded-full text-[11px] bg-[#38e8b0]/[0.08] hover:bg-[#38e8b0]/[0.18] border border-[#38e8b0]/25 text-[#9ef5d8] transition cursor-pointer">${esc(lb)}</button>`),
+          ...g.tags.slice(0, 3).map(tg => `<button type="button" data-games-ctag="${esc(tg)}" class="px-2.5 py-0.5 rounded-full text-[11px] bg-[#d9ff00]/12 hover:bg-[#d9ff00]/22 border border-[#d9ff00]/35 text-[#eaff66] font-medium transition cursor-pointer">#${esc(tg)}</button>`)
         ].join('');
 
         return `
@@ -3214,6 +3265,7 @@
         gamesCatFilter = jcat.dataset.jumpGamesCat || 'all';
         gamesSelectedGenres.clear();
         gamesSelectedTags.clear();
+      gamesSelectedCommunityTags.clear();
         renderApp(true);
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
@@ -3241,6 +3293,16 @@
         if (tg) {
           if (gamesSelectedTags.has(tg)) gamesSelectedTags.delete(tg);
           else gamesSelectedTags.add(tg);
+          renderGamesCatalog(false);
+        }
+        return;
+      }
+      const gctag = e.target.closest('[data-games-ctag]');
+      if (gctag) {
+        const tg = gctag.dataset.gamesCtag;
+        if (tg) {
+          if (gamesSelectedCommunityTags.has(tg)) gamesSelectedCommunityTags.delete(tg);
+          else gamesSelectedCommunityTags.add(tg);
           renderGamesCatalog(false);
         }
         return;
@@ -3586,6 +3648,7 @@
       gamesCatFilter = 'all';
       gamesSelectedGenres.clear();
       gamesSelectedTags.clear();
+      gamesSelectedCommunityTags.clear();
       const gs = document.getElementById('games-search');
       if (gs) gs.value = '';
       const sortSel = document.getElementById('games-sort');
@@ -3681,19 +3744,26 @@
     });
 
     const QUICK_GENRES = ['Экшены', 'Ролевые игры', 'Приключенческие игры', 'Инди', 'Стратегии', 'Симуляторы', 'Шутер', 'Хоррор', 'Головоломка', 'Гонки', 'Файтинг', 'Выживание'];
-    const QUICK_TAGS = ['Открытый мир', 'Глубокий сюжет', 'Похожа на Dark Souls', 'Рогалик', 'Кооператив', 'Отличный саундтрек', 'Атмосферная', 'Хардкор', 'Метроидвания', 'Песочница', 'От первого лица', 'Эксклюзив'];
+    const QUICK_LABELS = ['Открытый мир', 'Глубокий сюжет', 'Для одного игрока', 'Кооператив', 'От первого лица', 'От третьего лица', 'Постапокалипсис', 'Зомби', 'Выживание', 'Песочница'];
+    const QUICK_TAGS = ['Похожа на Dark Souls', 'Рогалик', 'Отличный саундтрек', 'Атмосферная', 'Хардкор', 'Метроидвания', 'Эксклюзив', 'Реиграбельная', 'Короткая', 'На вечерок'];
 
     let metaModalGame = null;
     let metaEditGenres = [];
+    let metaEditLabels = [];
     let metaEditTags = [];
 
     function openMetaModal(game) {
       metaModalGame = game;
       metaEditGenres = [...(game.customGenres || [])];
+      metaEditLabels = [...(game.customLabels || [])];
       metaEditTags = [...(game.customTags || [])];
       document.getElementById('meta-modal-subtitle').textContent = game.title;
       document.getElementById('meta-add-genre-input').value = '';
+      document.getElementById('meta-add-label-input').value = '';
       document.getElementById('meta-add-tag-input').value = '';
+      const isAdmin = Boolean(currentUser && currentUser.isAdmin);
+      const adminWrap = document.getElementById('meta-admin-ratings-wrap');
+      if (adminWrap) adminWrap.classList.toggle('hidden', !isAdmin);
       const ext = game.externalRatings || {};
       const mcInp = document.getElementById('meta-mc-score');
       const ocInp = document.getElementById('meta-oc-score');
@@ -3712,69 +3782,104 @@
     function renderMetaModal() {
       if (!metaModalGame) return;
       const steamGenres = (metaModalGame.genres || []).filter(g => g !== 'Сторонняя игра' && !metaEditGenres.some(x => x.toLowerCase() === g.toLowerCase()));
-      const steamTags = (metaModalGame.tags || []).filter(t => !metaEditTags.some(x => x.toLowerCase() === t.toLowerCase()));
+      const steamLabels = (metaModalGame.labels || []).filter(l => !metaEditLabels.some(x => x.toLowerCase() === l.toLowerCase()));
 
       document.getElementById('meta-current-genres').innerHTML = [
-        ...steamGenres.map(g => `<span class="px-2.5 py-1 rounded-full text-xs bg-[#66c0f4]/10 border border-[#66c0f4]/25 text-[#9bd6f9]/80">${esc(g)} <span class="text-[10px] opacity-60">Steam</span></span>`),
+        ...steamGenres.map(g => `<span class="px-2.5 py-1 rounded-full text-xs bg-[#66c0f4]/10 border border-[#66c0f4]/25 text-[#9bd6f9]/85">${esc(g)} <span class="text-[10px] opacity-60">Steam</span></span>`),
         ...metaEditGenres.map((g, i) => `<button type="button" data-rm-genre="${i}" class="px-2.5 py-1 rounded-full text-xs font-semibold bg-[#66c0f4]/22 border border-[#66c0f4]/55 text-white flex items-center gap-1 cursor-pointer">${esc(g)} <span class="text-[10px]">✕</span></button>`)
       ].join('') || '<span class="text-xs text-slate-400">Жанры пока не указаны</span>';
 
-      document.getElementById('meta-current-tags').innerHTML = [
-        ...steamTags.map(t => `<span class="px-2.5 py-1 rounded-full text-xs bg-white/[0.06] border border-white/12 text-slate-300">${esc(t)} <span class="text-[10px] opacity-60">Steam</span></span>`),
-        ...metaEditTags.map((t, i) => `<button type="button" data-rm-tag="${i}" class="px-2.5 py-1 rounded-full text-xs font-semibold bg-[#d9ff00]/18 border border-[#d9ff00]/55 text-[#eaff66] flex items-center gap-1 cursor-pointer">#${esc(t)} <span class="text-[10px]">✕</span></button>`)
+      document.getElementById('meta-current-labels').innerHTML = [
+        ...steamLabels.map(l => `<span class="px-2.5 py-1 rounded-full text-xs bg-[#38e8b0]/[0.08] border border-[#38e8b0]/25 text-[#a9f5dd]/90">${esc(l)} <span class="text-[10px] opacity-60">Steam</span></span>`),
+        ...metaEditLabels.map((l, i) => `<button type="button" data-rm-label="${i}" class="px-2.5 py-1 rounded-full text-xs font-semibold bg-[#38e8b0]/20 border border-[#38e8b0]/55 text-white flex items-center gap-1 cursor-pointer">${esc(l)} <span class="text-[10px]">✕</span></button>`)
       ].join('') || '<span class="text-xs text-slate-400">Метки пока не указаны</span>';
+
+      document.getElementById('meta-current-tags').innerHTML = metaEditTags.length
+        ? metaEditTags.map((t, i) => `<button type="button" data-rm-tag="${i}" class="px-2.5 py-1 rounded-full text-xs font-semibold bg-[#d9ff00]/18 border border-[#d9ff00]/55 text-[#eaff66] flex items-center gap-1 cursor-pointer">#${esc(t)} <span class="text-[10px]">✕</span></button>`).join('')
+        : '<span class="text-xs text-slate-400">Пользовательские теги пока не добавлены</span>';
 
       document.getElementById('meta-quick-genres').innerHTML = QUICK_GENRES.map(g => {
         const has = metaEditGenres.some(x => x.toLowerCase() === g.toLowerCase()) || steamGenres.some(x => x.toLowerCase() === g.toLowerCase());
         return `<button type="button" data-q-genre="${esc(g)}" class="px-2.5 py-1 rounded-full text-[11px] border transition cursor-pointer ${has ? 'opacity-40 border-white/10 text-slate-400' : 'bg-white/[0.04] hover:bg-[#66c0f4]/20 border-white/12 text-slate-300 hover:text-white'}">+ ${esc(g)}</button>`;
       }).join('');
 
+      document.getElementById('meta-quick-labels').innerHTML = QUICK_LABELS.map(l => {
+        const has = metaEditLabels.some(x => x.toLowerCase() === l.toLowerCase()) || steamLabels.some(x => x.toLowerCase() === l.toLowerCase());
+        return `<button type="button" data-q-label="${esc(l)}" class="px-2.5 py-1 rounded-full text-[11px] border transition cursor-pointer ${has ? 'opacity-40 border-white/10 text-slate-400' : 'bg-white/[0.04] hover:bg-[#38e8b0]/18 border-white/12 text-slate-300 hover:text-[#9ef5d8]'}">+ ${esc(l)}</button>`;
+      }).join('');
+
       document.getElementById('meta-quick-tags').innerHTML = QUICK_TAGS.map(t => {
-        const has = metaEditTags.some(x => x.toLowerCase() === t.toLowerCase()) || steamTags.some(x => x.toLowerCase() === t.toLowerCase());
+        const has = metaEditTags.some(x => x.toLowerCase() === t.toLowerCase());
         return `<button type="button" data-q-tag="${esc(t)}" class="px-2.5 py-1 rounded-full text-[11px] border transition cursor-pointer ${has ? 'opacity-40 border-white/10 text-slate-400' : 'bg-white/[0.04] hover:bg-[#d9ff00]/18 border-white/12 text-slate-300 hover:text-[#eaff66]'}">+ ${esc(t)}</button>`;
       }).join('');
     }
 
     function addMetaGenre(val) {
       const clean = String(val || '').trim().slice(0, 40);
-      if (!clean || metaEditGenres.some(x => x.toLowerCase() === clean.toLowerCase())) return;
-      metaEditGenres.push(clean);
-      renderMetaModal();
+      if (!clean) return;
+      if (metaEditGenres.length >= 8) { showToast('Максимум 8 своих жанров'); return; }
+      if (!metaEditGenres.some(x => x.toLowerCase() === clean.toLowerCase())) {
+        metaEditGenres.push(clean);
+        renderMetaModal();
+      }
+    }
+
+    function addMetaLabel(val) {
+      const clean = String(val || '').trim().slice(0, 40);
+      if (!clean) return;
+      if (metaEditLabels.length >= 15) { showToast('Максимум 15 своих меток'); return; }
+      if (!metaEditLabels.some(x => x.toLowerCase() === clean.toLowerCase())) {
+        metaEditLabels.push(clean);
+        renderMetaModal();
+      }
     }
 
     function addMetaTag(val) {
-      const clean = String(val || '').trim().slice(0, 40);
-      if (!clean || metaEditTags.some(x => x.toLowerCase() === clean.toLowerCase())) return;
-      metaEditTags.push(clean);
-      renderMetaModal();
+      const clean = String(val || '').trim().replace(/^#+/, '').slice(0, 40);
+      if (!clean) return;
+      if (metaEditTags.length >= 15) { showToast('Максимум 15 тегов'); return; }
+      if (!metaEditTags.some(x => x.toLowerCase() === clean.toLowerCase())) {
+        metaEditTags.push(clean);
+        renderMetaModal();
+      }
     }
 
     document.getElementById('btn-close-meta-modal').onclick = document.getElementById('btn-cancel-meta-modal').onclick = closeMetaModal;
     document.getElementById('meta-modal').onclick = e => {
       if (e.target.id === 'meta-modal') { closeMetaModal(); return; }
-      const rg = e.target.closest('[data-rm-genre]');
-      if (rg) { metaEditGenres.splice(Number(rg.dataset.rmGenre), 1); renderMetaModal(); return; }
-      const rt = e.target.closest('[data-rm-tag]');
-      if (rt) { metaEditTags.splice(Number(rt.dataset.rmTag), 1); renderMetaModal(); return; }
-      const qg = e.target.closest('[data-q-genre]');
-      if (qg) { addMetaGenre(qg.dataset.qGenre); return; }
-      const qt = e.target.closest('[data-q-tag]');
-      if (qt) { addMetaTag(qt.dataset.qTag); return; }
+      const rmG = e.target.closest('[data-rm-genre]');
+      if (rmG) { metaEditGenres.splice(Number(rmG.dataset.rmGenre), 1); renderMetaModal(); return; }
+      const rmL = e.target.closest('[data-rm-label]');
+      if (rmL) { metaEditLabels.splice(Number(rmL.dataset.rmLabel), 1); renderMetaModal(); return; }
+      const rmT = e.target.closest('[data-rm-tag]');
+      if (rmT) { metaEditTags.splice(Number(rmT.dataset.rmTag), 1); renderMetaModal(); return; }
+      const qG = e.target.closest('[data-q-genre]');
+      if (qG) { addMetaGenre(qG.dataset.qGenre); return; }
+      const qL = e.target.closest('[data-q-label]');
+      if (qL) { addMetaLabel(qL.dataset.qLabel); return; }
+      const qT = e.target.closest('[data-q-tag]');
+      if (qT) { addMetaTag(qT.dataset.qTag); return; }
     };
     document.getElementById('btn-meta-add-genre').onclick = () => {
       const inp = document.getElementById('meta-add-genre-input');
       addMetaGenre(inp.value);
       inp.value = '';
-      inp.focus();
+    };
+    document.getElementById('btn-meta-add-label').onclick = () => {
+      const inp = document.getElementById('meta-add-label-input');
+      addMetaLabel(inp.value);
+      inp.value = '';
     };
     document.getElementById('btn-meta-add-tag').onclick = () => {
       const inp = document.getElementById('meta-add-tag-input');
       addMetaTag(inp.value);
       inp.value = '';
-      inp.focus();
     };
     document.getElementById('meta-add-genre-input').addEventListener('keydown', e => {
       if (e.key === 'Enter') { e.preventDefault(); document.getElementById('btn-meta-add-genre').click(); }
+    });
+    document.getElementById('meta-add-label-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); document.getElementById('btn-meta-add-label').click(); }
     });
     document.getElementById('meta-add-tag-input').addEventListener('keydown', e => {
       if (e.key === 'Enter') { e.preventDefault(); document.getElementById('btn-meta-add-tag').click(); }
@@ -3823,11 +3928,14 @@
             appId: metaModalGame.appId,
             gameTitle: metaModalGame.title,
             genres: metaEditGenres,
+            labels: metaEditLabels,
             tags: metaEditTags,
             mcScore: document.getElementById('meta-mc-score')?.value ?? '',
             ocScore: document.getElementById('meta-oc-score')?.value ?? '',
-            updateRatings: (document.getElementById('meta-mc-score')?.value !== document.getElementById('meta-mc-score')?.dataset.orig)
+            updateRatings: Boolean(currentUser && currentUser.isAdmin) && (
+              (document.getElementById('meta-mc-score')?.value !== document.getElementById('meta-mc-score')?.dataset.orig)
               || (document.getElementById('meta-oc-score')?.value !== document.getElementById('meta-oc-score')?.dataset.orig)
+            )
           })
         });
         if (r.ok) {
