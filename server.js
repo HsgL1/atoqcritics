@@ -102,6 +102,39 @@ async function fetchSteamAchievements(steamId, appId) {
   }
 }
 
+async function fetchSteamGameTags(appId) {
+  if (!appId || appId <= 0) return [];
+  try {
+    const url = `https://store.steampowered.com/api/appdetails?appids=${encodeURIComponent(appId)}&l=russian`;
+    const res = await fetchWithRetry(url, 2);
+    if (!res.ok) return [];
+    const data = await res.response.json();
+    const entry = data && data[String(appId)];
+    if (!entry || !entry.success || !entry.data) return [];
+    const tags = [];
+    const seen = new Set();
+    const addTag = t => {
+      const clean = String(t || '').trim();
+      if (clean && !seen.has(clean.toLowerCase())) {
+        seen.add(clean.toLowerCase());
+        tags.push(clean);
+      }
+    };
+    if (Array.isArray(entry.data.genres)) {
+      entry.data.genres.forEach(g => addTag(g.description));
+    }
+    const usefulCatIds = new Set([1, 2, 9, 36, 38, 49]); // Multiplayer, Singleplayer, Co-op, Online PvP, Online Co-op, PvP
+    if (Array.isArray(entry.data.categories)) {
+      entry.data.categories.forEach(c => {
+        if (usefulCatIds.has(Number(c.id))) addTag(c.description);
+      });
+    }
+    return tags.slice(0, 6);
+  } catch {
+    return [];
+  }
+}
+
 // ==================== SIGNED COOKIE AUTH ====================
 const COOKIE_NAME = 'atoq_steam_sid';
 
@@ -233,6 +266,12 @@ async function initDb() {
       is_read BOOLEAN DEFAULT FALSE,
       created_at BIGINT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS game_tags (
+      app_id INTEGER PRIMARY KEY,
+      tags_json TEXT NOT NULL,
+      updated_at BIGINT NOT NULL
+    );
   `);
   await pool.query(`
     ALTER TABLE reviews ADD COLUMN IF NOT EXISTS ach_unlocked INTEGER;
@@ -245,6 +284,7 @@ async function initDb() {
   console.log('Облачная база PostgreSQL подключена и таблицы готовы.');
   // Backfill achievements for existing reviews in background
   backfillAchievements().catch(() => {});
+  backfillGameTags().catch(() => {});
 }
 
 async function backfillAchievements() {
@@ -255,6 +295,38 @@ async function backfillAchievements() {
     if (ach) {
       await pool.query('UPDATE reviews SET ach_unlocked = $1, ach_total = $2 WHERE id = $3', [ach.unlocked, ach.total, r.id]);
     }
+  }
+}
+
+async function ensureGameTags(appId) {
+  if (!appId || appId <= 0) return [];
+  try {
+    const existing = await pool.query('SELECT tags_json FROM game_tags WHERE app_id = $1', [appId]);
+    if (existing.rows[0]) return JSON.parse(existing.rows[0].tags_json || '[]');
+    const tags = await fetchSteamGameTags(appId);
+    if (tags.length > 0) {
+      await pool.query(
+        'INSERT INTO game_tags (app_id, tags_json, updated_at) VALUES ($1, $2, $3) ON CONFLICT (app_id) DO UPDATE SET tags_json = EXCLUDED.tags_json, updated_at = EXCLUDED.updated_at',
+        [appId, JSON.stringify(tags), Date.now()]
+      );
+    }
+    return tags;
+  } catch {
+    return [];
+  }
+}
+
+async function backfillGameTags() {
+  const { rows } = await pool.query(`
+    SELECT DISTINCT r.app_id
+    FROM reviews r
+    LEFT JOIN game_tags gt ON gt.app_id = r.app_id
+    WHERE r.app_id > 0 AND gt.app_id IS NULL
+    LIMIT 100
+  `);
+  for (const row of rows) {
+    await ensureGameTags(row.app_id);
+    await new Promise(res => setTimeout(res, 380));
   }
 }
 
@@ -509,9 +581,10 @@ app.get('/api/steam/search', requireAuth, async (req, res) => {
 async function hydrateReviews() {
   const [revRes, voteRes, commRes, reactRes] = await Promise.all([
     pool.query(`
-      SELECT r.*, u.name AS author_name, u.avatar AS author_avatar, u.profile_url AS author_url
+      SELECT r.*, u.name AS author_name, u.avatar AS author_avatar, u.profile_url AS author_url, gt.tags_json AS game_tags_json
       FROM reviews r
       JOIN users u ON u.steam_id = r.user_steam_id
+      LEFT JOIN game_tags gt ON gt.app_id = r.app_id
       ORDER BY r.created_at DESC
     `),
     pool.query('SELECT * FROM votes'),
@@ -560,6 +633,7 @@ async function hydrateReviews() {
     appId: r.app_id,
     gameTitle: r.game_title,
     gameImg: r.game_img,
+    gameTags: r.app_id > 0 ? (r.game_tags_json ? JSON.parse(r.game_tags_json) : []) : ['Сторонняя игра'],
     scores: {
       gameplay: r.gameplay,
       visuals: r.visuals,
@@ -615,7 +689,10 @@ app.post('/api/reviews', requireAuth, async (req, res) => {
     const id = 'rev_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
 
     const numAppId = Number(appId) || 0;
-    const ach = numAppId > 0 ? await fetchSteamAchievements(req.user.steam_id, numAppId) : null;
+    const [ach] = await Promise.all([
+      numAppId > 0 ? fetchSteamAchievements(req.user.steam_id, numAppId) : Promise.resolve(null),
+      numAppId > 0 ? ensureGameTags(numAppId) : Promise.resolve([])
+    ]);
 
     await pool.query(`
       INSERT INTO reviews (id, user_steam_id, app_id, game_title, game_img, gameplay, visuals, narrative, audio, emotions, total, no_narrative, hours_played, ach_unlocked, ach_total, text, created_at)
