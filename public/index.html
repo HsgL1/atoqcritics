@@ -251,6 +251,10 @@
         </nav>
         <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button id="btn-new-review" type="button" class="btn-acid px-3.5 sm:px-4 py-2 rounded-full text-xs sm:text-sm cursor-pointer">+ <span class="hidden sm:inline">Новый </span>обзор</button>
+          <button id="btn-notifications" type="button" title="Уведомления" aria-label="Уведомления" class="liquid-pill p-2 rounded-full text-slate-200 hover:text-white relative cursor-pointer">
+            <i data-lucide="bell" class="w-4 h-4"></i>
+            <span id="notif-badge" class="hidden absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#d9ff00] text-[#090c12] text-[10px] font-black flex items-center justify-center shadow-[0_0_12px_rgba(217,255,0,0.65)]">0</span>
+          </button>
           <button id="btn-logout" type="button" title="Выйти" class="liquid-pill p-2 rounded-full text-slate-300 hover:text-white cursor-pointer"><i data-lucide="log-out" class="w-4 h-4"></i></button>
         </div>
       </div>
@@ -271,6 +275,31 @@
         </button>
       </nav>
     </header>
+
+    <!-- NOTIFICATIONS LIQUID-GLASS PANEL (Desktop Popover + Mobile Drop Sheet) -->
+    <div id="notif-panel" class="hidden fixed inset-x-3 sm:inset-x-auto sm:right-6 top-[72px] sm:top-[76px] sm:w-[400px] z-40 liquid-glass-strong anim-popover rounded-[26px] overflow-hidden shadow-2xl border border-white/15">
+      <div class="px-4 py-3.5 border-b border-white/10 flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <i data-lucide="bell" class="w-4 h-4 text-[#d9ff00]"></i>
+          <h3 class="text-sm font-bold text-white">Уведомления</h3>
+          <span id="notif-panel-count" class="text-[11px] text-slate-400"></span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <button id="btn-notif-read-all" type="button" class="text-[11px] font-medium text-[#7ccaf8] hover:text-[#d9ff00] px-2 py-1 rounded-full hover:bg-white/[0.08] transition cursor-pointer">Прочитать все</button>
+          <button id="btn-notif-clear" type="button" title="Очистить все" class="text-[11px] text-slate-400 hover:text-rose-400 px-2 py-1 rounded-full hover:bg-rose-500/10 transition cursor-pointer">Очистить</button>
+        </div>
+      </div>
+
+      <!-- Filter Tabs by Notification Type -->
+      <div class="px-3.5 py-2 border-b border-white/[0.07] flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+        <button type="button" data-notif-filter="all" class="liquid-pill liquid-pill-active px-3 py-1 rounded-full text-[11px] font-semibold shrink-0 cursor-pointer">Все</button>
+        <button type="button" data-notif-filter="reactions" class="liquid-pill px-3 py-1 rounded-full text-[11px] font-semibold shrink-0 cursor-pointer">Реакции</button>
+        <button type="button" data-notif-filter="comments" class="liquid-pill px-3 py-1 rounded-full text-[11px] font-semibold shrink-0 cursor-pointer">Комментарии</button>
+        <button type="button" data-notif-filter="replies" class="liquid-pill px-3 py-1 rounded-full text-[11px] font-semibold shrink-0 cursor-pointer">Ответы</button>
+      </div>
+
+      <div id="notif-list" class="max-h-[62dvh] sm:max-h-[420px] overflow-y-auto overscroll-contain p-2.5 space-y-2"></div>
+    </div>
 
     <main class="flex-1 w-full max-w-6xl mx-auto px-3 sm:px-6 pt-[124px] sm:pt-[86px] pb-12 sm:pb-16">
       <section id="view-home" class="space-y-5 anim-view">
@@ -497,6 +526,7 @@
     const EMOJI_PALETTE = ['🔥', '❤️', '😂', '🤯', '💯', '👑', '🐐', '💀', '🤡', '🤮', '😢', '⚡', '🎯', '🫡'];
 
     let currentUser = null, users = [], reviews = [], myLibrary = [], libraryPrivate = false, libraryError = '';
+    let notifications = [], notifFilter = 'all', notifOpen = false;
     let activeView = 'home', profileUserId = null, searchTab = 'all', selectedGame = null, editingReviewId = null;
     let lastDisplayedGames = [];
     let modalScores = { gameplay: 16, visuals: 16, narrative: 16, audio: 16, emotions: 16 };
@@ -641,6 +671,8 @@
       document.getElementById('app-shell').classList.remove('hidden');
       // Fetch Steam library in the background so it doesn't slow down opening the site
       loadMyLibrary();
+      loadNotifications();
+      setInterval(() => { if (!document.hidden && currentUser) loadNotifications(); }, 30000);
     }
 
     async function loadUsers() {
@@ -651,6 +683,127 @@
       const r = await fetch('/api/reviews');
       reviews = (await r.json()).reviews || [];
     }
+    async function loadNotifications() {
+      try {
+        const r = await fetch('/api/notifications');
+        if (!r.ok) return;
+        const d = await r.json();
+        notifications = d.notifications || [];
+        updateNotifBadge();
+        if (notifOpen) renderNotifPanel();
+      } catch {}
+    }
+
+    function updateNotifBadge() {
+      const unread = notifications.filter(n => !n.isRead).length;
+      const badge = document.getElementById('notif-badge');
+      const btn = document.getElementById('btn-notifications');
+      if (badge) {
+        badge.textContent = unread > 99 ? '99+' : String(unread);
+        badge.classList.toggle('hidden', unread === 0);
+      }
+      if (btn) {
+        btn.classList.toggle('border-[#d9ff00]/50', unread > 0);
+      }
+    }
+
+    function renderNotifPanel() {
+      const listEl = document.getElementById('notif-list');
+      const countEl = document.getElementById('notif-panel-count');
+      const unread = notifications.filter(n => !n.isRead).length;
+      if (countEl) countEl.textContent = unread ? `(${unread} новых)` : '';
+
+      document.querySelectorAll('[data-notif-filter]').forEach(btn => {
+        btn.classList.toggle('liquid-pill-active', btn.dataset.notifFilter === notifFilter);
+      });
+
+      const filtered = notifications.filter(n => {
+        if (notifFilter === 'reactions') return n.type === 'reaction' || n.type === 'vote';
+        if (notifFilter === 'comments') return n.type === 'comment';
+        if (notifFilter === 'replies') return n.type === 'reply';
+        return true;
+      });
+
+      if (!filtered.length) {
+        listEl.innerHTML = '<div class="py-10 text-center text-xs text-slate-400">Пока нет уведомлений</div>';
+        return;
+      }
+
+      listEl.innerHTML = filtered.map(n => {
+        let accentBorder = 'border-l-[#d9ff00]';
+        let typeTag = 'Реакция';
+        let typeTagClass = 'bg-[#d9ff00]/15 text-[#d9ff00] border-[#d9ff00]/35';
+        let miniBadge = n.payload || '🔥';
+        let actionLine = `отреагировал ${esc(n.payload || '')} на ваш обзор`;
+        let snippetHtml = '';
+
+        if (n.type === 'vote') {
+          const isDislike = n.payload === '👎';
+          accentBorder = isDislike ? 'border-l-rose-400' : 'border-l-[#d9ff00]';
+          typeTag = isDislike ? 'Дизлайк' : 'Лайк';
+          typeTagClass = isDislike ? 'bg-rose-500/15 text-rose-300 border-rose-400/35' : 'bg-[#d9ff00]/15 text-[#d9ff00] border-[#d9ff00]/35';
+          miniBadge = n.payload || '👍';
+          actionLine = isDislike ? 'поставил дизлайк вашему обзору' : 'лайкнул ваш обзор';
+        } else if (n.type === 'comment') {
+          accentBorder = 'border-l-[#66c0f4]';
+          typeTag = 'Комментарий';
+          typeTagClass = 'bg-[#66c0f4]/15 text-[#7ccaf8] border-[#66c0f4]/35';
+          miniBadge = '💬';
+          actionLine = 'прокомментировал ваш обзор';
+          if (n.payload) {
+            snippetHtml = `<div class="mt-1.5 rounded-xl bg-black/25 border border-white/[0.07] px-2.5 py-1.5 text-xs text-slate-200 line-clamp-2 break-words">«${esc(n.payload)}»</div>`;
+          }
+        } else if (n.type === 'reply') {
+          accentBorder = 'border-l-[#c084fc]';
+          typeTag = 'Ответ';
+          typeTagClass = 'bg-purple-500/20 text-purple-300 border-purple-400/40';
+          miniBadge = '↩️';
+          actionLine = 'ответил на ваш комментарий';
+          if (n.payload) {
+            snippetHtml = `<div class="mt-1.5 rounded-xl bg-purple-500/[0.08] border border-purple-400/20 px-2.5 py-1.5 text-xs text-slate-200 line-clamp-2 break-words">«${esc(n.payload)}»</div>`;
+          }
+        }
+
+        return `
+          <button
+            type="button"
+            data-open-notif="${esc(n.id)}"
+            data-notif-review="${esc(n.reviewId || '')}"
+            data-notif-type="${esc(n.type)}"
+            class="w-full text-left rounded-2xl p-3 border border-white/[0.09] border-l-[3px] ${accentBorder} ${n.isRead ? 'bg-white/[0.03] opacity-75 hover:opacity-100' : 'bg-white/[0.08]'} hover:bg-white/[0.11] transition cursor-pointer flex items-start gap-3"
+          >
+            <div class="relative shrink-0 mt-0.5">
+              <img src="${esc(n.actorAvatar || '/logo.jpg')}" class="w-9 h-9 rounded-full object-cover border border-white/20" />
+              <span class="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[#0e1420] border border-white/20 flex items-center justify-center text-[11px] shadow">${miniBadge}</span>
+            </div>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center justify-between gap-2">
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border ${typeTagClass}">${typeTag}</span>
+                <div class="flex items-center gap-1.5 shrink-0">
+                  <span class="text-[10px] text-slate-400">${formatCommentTime(n.createdAt)}</span>
+                  ${!n.isRead ? '<span class="w-2 h-2 rounded-full bg-[#d9ff00]"></span>' : ''}
+                </div>
+              </div>
+              <div class="text-xs text-slate-200 mt-1 leading-snug break-words">
+                <span class="font-bold text-white">${esc(n.actorName)}</span> ${actionLine} ${n.gameTitle ? `<span class="font-semibold text-[#eaf4ff]">«${esc(n.gameTitle)}»</span>` : ''}
+              </div>
+              ${snippetHtml}
+            </div>
+          </button>
+        `;
+      }).join('');
+    }
+
+    function toggleNotifPanel(forceState) {
+      notifOpen = typeof forceState === 'boolean' ? forceState : !notifOpen;
+      const panel = document.getElementById('notif-panel');
+      if (panel) panel.classList.toggle('hidden', !notifOpen);
+      if (notifOpen) {
+        renderNotifPanel();
+        loadNotifications();
+      }
+    }
+
     async function loadMyLibrary() {
       const r = await fetch('/api/steam/library');
       if (r.ok) {
@@ -2072,8 +2225,76 @@
     bindClearSearch('profile-search', 'clear-profile-search', () => renderProfileListOnly(false));
     bindClearSearch('steam-game-search', 'clear-steam-search', () => renderSearchResults(false));
 
+    document.getElementById('btn-notifications').onclick = e => {
+      e.stopPropagation();
+      toggleNotifPanel();
+    };
+
+    document.getElementById('btn-notif-read-all').onclick = () => {
+      notifications.forEach(n => { n.isRead = true; });
+      updateNotifBadge();
+      renderNotifPanel();
+      fetch('/api/notifications/read', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(() => {});
+    };
+
+    document.getElementById('btn-notif-clear').onclick = () => {
+      notifications = [];
+      updateNotifBadge();
+      renderNotifPanel();
+      fetch('/api/notifications', { method: 'DELETE' }).catch(() => {});
+    };
+
+    document.getElementById('notif-panel').onclick = async e => {
+      e.stopPropagation();
+      const ft = e.target.closest('[data-notif-filter]');
+      if (ft) {
+        notifFilter = ft.dataset.notifFilter;
+        renderNotifPanel();
+        return;
+      }
+      const item = e.target.closest('[data-open-notif]');
+      if (item) {
+        const nid = item.dataset.openNotif;
+        const revId = item.dataset.notifReview;
+        const nType = item.dataset.notifType;
+        const nObj = notifications.find(x => x.id === nid);
+        if (nObj && !nObj.isRead) {
+          nObj.isRead = true;
+          updateNotifBadge();
+          fetch('/api/notifications/read', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: nid }) }).catch(() => {});
+        }
+        toggleNotifPanel(false);
+        if (revId) {
+          await loadReviews();
+          activeView = 'feed';
+          document.getElementById('feed-search').value = '';
+          const clearBtn = document.getElementById('clear-feed-search');
+          if (clearBtn) clearBtn.classList.add('hidden');
+          if (nType === 'comment' || nType === 'reply') openComments[revId] = true;
+          renderApp(false);
+          setTimeout(() => {
+            const card = document.querySelector(`#view-feed [data-review-card="${CSS.escape(revId)}"]`);
+            if (card) {
+              card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              card.style.borderColor = 'rgba(217, 255, 0, 0.8)';
+              setTimeout(() => { card.style.borderColor = ''; }, 1400);
+            }
+          }, 80);
+        }
+      }
+    };
+
+    document.addEventListener('click', e => {
+      if (notifOpen && !e.target.closest('#notif-panel') && !e.target.closest('#btn-notifications')) {
+        toggleNotifPanel(false);
+      }
+    });
+
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape' && isScrollLocked) closeModal();
+      if (e.key === 'Escape') {
+        if (isScrollLocked) closeModal();
+        if (notifOpen) toggleNotifPanel(false);
+      }
     });
 
     boot();
