@@ -620,6 +620,47 @@ app.get('/api/steam/cover/:appId', async (req, res) => {
   return res.status(404).end();
 });
 
+const posterUrlCache = new Map();
+
+app.get('/api/steam/poster/:appId', async (req, res) => {
+  const appId = Number(req.params.appId);
+  if (!appId || appId <= 0) return res.status(404).end();
+  if (posterUrlCache.has(appId)) {
+    const cached = posterUrlCache.get(appId);
+    if (cached) {
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.redirect(302, cached);
+    }
+    return res.status(404).end();
+  }
+  try {
+    const payload = {
+      ids: [{ appid: appId }],
+      context: { language: 'english', country_code: 'US', steam_realm: 1 },
+      data_request: { include_assets: true, include_assets_without_overrides: true }
+    };
+    const apiUrl = `https://api.steampowered.com/IStoreBrowseService/GetItems/v1/?input_json=${encodeURIComponent(JSON.stringify(payload))}`;
+    const r = await fetchWithRetry(apiUrl, 2);
+    if (r.ok) {
+      const data = await r.response.json();
+      const item = data && data.response && data.response.store_items && data.response.store_items[0];
+      const assets = item && item.assets;
+      if (assets) {
+        const fmt = assets.asset_url_format || `steam/apps/${appId}/\${FILENAME}`;
+        const fn = assets.library_capsule_2x || assets.library_capsule || assets.hero_capsule_2x || assets.hero_capsule;
+        if (fn) {
+          const posterUrl = 'https://shared.fastly.steamstatic.com/store_item_assets/' + fmt.replace('${FILENAME}', fn);
+          posterUrlCache.set(appId, posterUrl);
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+          return res.redirect(302, posterUrl);
+        }
+      }
+      posterUrlCache.set(appId, null);
+    }
+  } catch {}
+  return res.status(404).end();
+});
+
 app.get('/api/steam/search', requireAuth, async (req, res) => {
   const term = String(req.query.q || '').trim();
   if (term.length < 2) return res.json({ games: [] });
