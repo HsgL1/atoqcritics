@@ -256,7 +256,6 @@
             <i data-lucide="bell" class="w-4 h-4"></i>
             <span id="notif-badge" class="hidden absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#d9ff00] text-[#090c12] text-[10px] font-black flex items-center justify-center shadow-[0_0_12px_rgba(217,255,0,0.65)]">0</span>
           </button>
-          <button id="btn-logout" type="button" title="Выйти" class="liquid-pill p-2 rounded-full text-slate-300 hover:text-white cursor-pointer"><i data-lucide="log-out" class="w-4 h-4"></i></button>
         </div>
       </div>
 
@@ -633,6 +632,23 @@
       <div class="px-5 py-3.5 border-t border-white/10 flex justify-end gap-2">
         <button id="btn-cancel-meta-modal" type="button" class="liquid-pill px-4 py-2 rounded-full text-xs sm:text-sm cursor-pointer">Отмена</button>
         <button id="btn-save-meta-modal" type="button" class="btn-acid px-5 py-2 rounded-full text-xs sm:text-sm cursor-pointer">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: LOGOUT CONFIRMATION -->
+  <div id="logout-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md anim-modal-bg">
+    <div class="liquid-glass-strong anim-modal-panel w-full max-w-sm rounded-[28px] p-6 text-center space-y-4">
+      <div class="w-12 h-12 rounded-2xl bg-rose-500/15 border border-rose-400/35 text-rose-400 flex items-center justify-center mx-auto">
+        <i data-lucide="log-out" class="w-5 h-5"></i>
+      </div>
+      <div>
+        <h3 class="text-lg font-bold text-white">Выйти из аккаунта?</h3>
+        <p class="text-xs text-slate-400 mt-1">Вы сможете в любой момент вернуться через Steam.</p>
+      </div>
+      <div class="flex gap-2.5 pt-1">
+        <button id="btn-cancel-logout" type="button" class="liquid-pill flex-1 py-2.5 rounded-full text-sm font-semibold text-slate-200 cursor-pointer">Отмена</button>
+        <button id="btn-confirm-logout" type="button" class="flex-1 py-2.5 rounded-full text-sm font-bold bg-rose-500 hover:bg-rose-400 text-white transition cursor-pointer">Выйти</button>
       </div>
     </div>
   </div>
@@ -1855,9 +1871,10 @@
                 <a href="${esc(u.profile_url)}" target="_blank" rel="noopener" class="text-xs text-[#66c0f4] hover:underline">Профиль в Steam (${esc(u.steam_id)})</a>
               </div>
             </div>
-            <div class="flex gap-3">
+            <div class="flex flex-wrap items-center gap-2.5">
               <div class="liquid-pill rounded-2xl px-4 py-2 text-center"><div class="text-lg font-bold">${uRevs.length}</div><div class="text-[11px] text-slate-400">Обзоров</div></div>
               <div class="liquid-pill rounded-2xl px-4 py-2 text-center"><div class="text-lg font-bold text-[#d9ff00]">${avg}</div><div class="text-[11px] text-slate-400">Средний балл</div></div>
+              ${u.steam_id === currentUser.steam_id ? '<button type="button" data-open-logout-modal="1" class="liquid-pill px-3.5 py-2.5 rounded-2xl text-xs font-semibold text-rose-300 hover:text-rose-200 hover:border-rose-400/50 hover:bg-rose-500/10 flex items-center gap-1.5 cursor-pointer"><i data-lucide="log-out" class="w-3.5 h-3.5"></i><span>Выйти</span></button>' : ''}
             </div>
           </div>`;
         const row = (r, i) => {
@@ -2025,7 +2042,9 @@
     document.getElementById('nav-feed').onclick = document.getElementById('mnav-feed').onclick = document.getElementById('btn-back-to-feed').onclick = () => { activeView = 'feed'; openEmojiPickerId = null; renderApp(true); window.scrollTo({ top: 0, behavior: 'smooth' }); };
     document.getElementById('nav-games').onclick = document.getElementById('mnav-games').onclick = () => { activeView = 'games'; openEmojiPickerId = null; renderApp(true); window.scrollTo({ top: 0, behavior: 'smooth' }); };
     document.getElementById('nav-profile').onclick = document.getElementById('mnav-profile').onclick = () => { activeView = 'profile'; profileUserId = currentUser.steam_id; openEmojiPickerId = null; renderApp(true); window.scrollTo({ top: 0, behavior: 'smooth' }); };
-    document.getElementById('btn-logout').onclick = async () => { await fetch('/api/logout', { method: 'POST' }); location.reload(); };
+    document.getElementById('btn-cancel-logout').onclick = () => document.getElementById('logout-modal').classList.add('hidden');
+    document.getElementById('logout-modal').onclick = e => { if (e.target.id === 'logout-modal') document.getElementById('logout-modal').classList.add('hidden'); };
+    document.getElementById('btn-confirm-logout').onclick = async () => { await fetch('/api/logout', { method: 'POST' }); location.reload(); };
     document.getElementById('btn-new-review').onclick = () => {
       openEmojiPickerId = null;
       editingReviewId = null;
@@ -2369,6 +2388,12 @@
     });
 
     document.getElementById('app-shell').onclick = async e => {
+      const lom = e.target.closest('[data-open-logout-modal]');
+      if (lom) {
+        document.getElementById('logout-modal').classList.remove('hidden');
+        if (window.lucide) lucide.createIcons();
+        return;
+      }
       const emeta = e.target.closest('[data-edit-game-meta]');
       if (emeta) {
         const game = buildAggregatedGames().find(x => x.key === emeta.dataset.editGameMeta);
